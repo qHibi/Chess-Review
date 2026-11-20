@@ -236,7 +236,7 @@ td img,td i.ic{width:16px;height:16px;vertical-align:middle;margin-right:5px;dis
 let PIECE_SET = 'cburnett'; // any set in lichess-org/lila public/piece
 const PIECE_URL = (c,p)=>`https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/${PIECE_SET}/${c}${p}.svg`;
 const ICON_FILE = {miss:'missed'};   // the image for "miss" is missed.png
-const ICON_URL  = k=>`/images/moves/${ICON_FILE[k]||k.toLowerCase()}.png`;
+const ICON_URL  = k=>`./images/moves/${ICON_FILE[k]||k.toLowerCase()}.png`;
 const ENGINE_URL = 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js';   // classic asm.js engine (automatic fallback)
 // Stockfish 18 "lite" compiled to WebAssembly: single-threaded, needs no special server headers, about 7 MB
 const WASM_BASES = ['https://cdn.jsdelivr.net/npm/stockfish@18.0.8/bin/','https://cdn.jsdelivr.net/npm/stockfish@18.0.8/src/'];
@@ -502,7 +502,7 @@ function applyTheme(){
   $('colAccent').value=acc.length===7?acc:'#f0c93f';
   $('selPieces').value=LOOK.piece;
   $('piecePrev').replaceChildren(...['wN','bQ','wK'].map(n=>{const i=new Image();i.src=PIECE_URL(n[0],n[1]);i.alt='';i.style.cssText='width:34px;height:34px';return i}));
-  try{localStorage.setItem(LOOK_KEY,JSON.stringify(LOOK))}catch(e){}
+ try{localStorage.setItem(LOOK_KEY,JSON.stringify(LOOK))}catch(e){}
   if(PIECE_SET!==LOOK.piece){PIECE_SET=LOOK.piece;render()}
 }
 function buildThemes(){
@@ -523,7 +523,8 @@ function buildThemes(){
   swatches('themes',[...Object.entries(THEMES).map(([id,t])=>[id,t.label,t.light,t.dark]),['custom','Custom',LOOK.custom.light,LOOK.custom.dark]],id=>{LOOK.board=id});
   swatches('borders',[...Object.entries(BORDERS).map(([id,[l,c]])=>[id,l,c||'transparent',c||'transparent']),['custom','Custom',LOOK.bcol,LOOK.bcol]],id=>{LOOK.border=id});
   $('selPieces').innerHTML=PIECE_SETS.map(p=>`<option value="${p}">${p.replace(/(^|-)(\w)/g,(m,a,b)=>(a?' ':'')+b.toUpperCase())}</option>`).join('');
-  $('selPieces').onchange=e=>{LOOK.piece=e.target.value;applyTheme()};
+  $('selPieces').onchange=e=>{LOOK.piece=e.target.value;applyTheme();$('piecePrev').replaceChildren(...['wN','bQ','wK'].map(n=>{const i=new Image();i.src=PIECE_URL(n[0],n[1]);i.alt='';i.style.cssText='width:34px;height:34px';return i}));
+   };
   $('colLight').oninput=e=>{LOOK.custom.light=e.target.value;applyTheme()};
   $('colDark').oninput=e=>{LOOK.custom.dark=e.target.value;applyTheme()};
   $('colBorder').oninput=e=>{LOOK.bcol=e.target.value;applyTheme()};
@@ -1134,7 +1135,7 @@ function openMenu(i,x,y){
     b.onclick=()=>{if(Date.now()-ctxAt<350)return;closeMenu();setOverride(i,k)};  // ignore the release of the long-press
     m.appendChild(b);
   };
-  ORDER.forEach(k=>{const ic=iconNode(k,'');ic.style.cssText='width:18px;height:18px;display:block;flex:none';item(CLS[k].label,k,ic)});
+  ORDER.forEach(k=>{const ic=iconNode(k,'');ic.style.cssText='max-width:18px;max-height:18px;display:block;flex:none';item(CLS[k].label,k,ic)});
   if(S.over[i])item('Reset to engine result',null);
   m.hidden=false;
   const w=m.offsetWidth,hh=m.offsetHeight;
