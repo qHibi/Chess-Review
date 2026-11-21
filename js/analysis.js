@@ -12,6 +12,8 @@ import {renderMoves} from './ui/moves.js';
 import {renderBar,renderLines} from './ui/panels.js';
 import {renderSummary} from './ui/summary.js';
 import {flushLines,liveAnalyze} from './live.js';
+import {sfx} from './sound.js';
+import {resetFx} from './ui/fx.js';
 
 /* ---------- Game analysis ----------
    analyze(): every position of the game at CFG.depth (several workers, segments of the game each), classifying as data arrives.
@@ -44,6 +46,7 @@ export async function analyze(){
   S.paused=false;resumeAll();S.deep=false;
   if(!loadPgn())return;
   const run=++S.run;S.batch=true;$('bAnalyze').disabled=true;syncPause();
+  sfx('start');resetFx();                               // every board effect may play once again for this analysis
   setStatus('Checking opening book…');
   const M=MAIN;
   await fetchBook(M);
@@ -74,6 +77,7 @@ export async function analyze(){
   S.batch=false;$('bAnalyze').disabled=false;
   withLine(M,classifyAll);M.nextCls=M.fens.length;S.done=true;
   setStatus('Analysis complete at depth '+CFG.depth+'. '+bookNote()+'.');
+  sfx('done');
   renderMoves();renderSummary();render();renderLines();flushLines();
   $('prog').style.width='0';syncPause();
   deepen(run);liveAnalyze();                          // (book positions have no stored search yet)

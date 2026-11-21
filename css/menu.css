@@ -5,3 +5,10 @@
 .ctx-i:hover,.ctx-i:focus-visible{background:var(--line)}
 .ctx-i.on{background:var(--line);font-weight:700}
 .hint{font-size:11px;color:var(--mute);margin-top:6px}
+/* promotion picker: icons only */
+.ctx.promo{min-width:0;padding:6px;overflow:visible}
+.promo-row{display:flex;gap:4px}
+.ctx-i.promo-i{width:64px;height:64px;padding:4px;justify-content:center;border-radius:8px;background:var(--line);border:2px solid transparent}
+.ctx-i.promo-i:hover,.ctx-i.promo-i:focus-visible{background:var(--accent);border-color:#fff}
+.ctx-i.promo-i img{width:100%;height:100%;display:block;pointer-events:none}
+.promo-fb{font-size:44px;line-height:1}

@@ -4,6 +4,7 @@ import {CLS} from '../config.js';
 import {iconNode} from './icons.js';
 import {render} from './board.js';
 import {phasesFor,PH_NAME} from '../phase.js';
+import {moveSfx} from '../sound.js';
 
 export function renderVerdict(c,mv){
   const v=$('verdict');v.replaceChildren();
@@ -50,7 +51,7 @@ export function renderLines(){
     seq.forEach((m,k)=>{
       if(col==='w'||k===0){const n=document.createElement('span');n.className='n';n.textContent=col==='w'?num+'.':num+'…';mv.appendChild(n)}
       const s=document.createElement('span');s.textContent=m.san;
-      s.onclick=()=>{S.preview={fen:m.fen,from:m.from,to:m.to};render()};
+      s.onclick=()=>{S.preview={fen:m.fen,from:m.from,to:m.to};moveSfx(m.san,m.fen);render()};
       mv.appendChild(s);
       if(col==='b')num++;col=col==='w'?'b':'w';
     });

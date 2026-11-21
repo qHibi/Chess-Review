@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" crossorigin>
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/board.css">
+<link rel="stylesheet" href="css/fx.css">
 <link rel="stylesheet" href="css/animations.css">
 <link rel="stylesheet" href="css/moves.css">
 <link rel="stylesheet" href="css/themes.css">
@@ -24,7 +25,7 @@
     <div class="boardwrap">
       <div class="evalbar" id="evalbar"><div class="white" id="evalwhite"></div><span class="top" id="evtop"></span><span class="bot" id="evbot"></span></div>
       <div class="col">
-        <div class="board" id="board" aria-label="Chess board"></div>
+        <div class="bstage" id="bstage"><div class="board" id="board" aria-label="Chess board"></div><div class="fx" id="fx" aria-hidden="true"></div></div>
         <div class="controls">
           <button id="bStart" title="Start" data-icon="skip-back"></button><button id="bPrev" title="Previous (←)" data-icon="chevron-left"></button>
           <button id="bNext" title="Next (→)" data-icon="chevron-right"></button><button id="bEnd" title="End" data-icon="skip-forward"></button>
@@ -38,7 +39,10 @@
   <div class="side">
     <div class="top">
       <div class="brand"><span class="logo" data-icon="microscope" data-size="22"></span><b>Analysis Board</b></div>
-      <button type="button" id="bSettings" data-icon="settings">Settings</button>
+      <div class="top-btns">
+        <button type="button" id="bSound" title="Sound effects (M)" data-icon="volume" aria-pressed="true"></button>
+        <button type="button" id="bSettings" data-icon="settings">Settings</button>
+      </div>
     </div>
 
     <div class="card" id="importCard">
@@ -96,6 +100,7 @@
       <div class="tabs" role="tablist">
         <button type="button" class="tab on" role="tab" data-tab="analysis" data-icon="cpu">Analysis</button>
         <button type="button" class="tab" role="tab" data-tab="appearance" data-icon="palette">Appearance</button>
+        <button type="button" class="tab" role="tab" data-tab="sound" data-icon="volume">Sound</button>
       </div>
       <button type="button" class="mini" id="bCloseSet" title="Close" data-icon="x"></button>
     </div>
@@ -132,6 +137,14 @@
       <div class="row" style="margin-top:0"><select class="sel" id="selPieces" aria-label="Piece set"></select><span id="piecePrev" style="display:flex"></span></div>
       <div class="sub">Board border</div><div class="themes" id="borders" role="radiogroup" aria-label="Board border"></div>
       <div class="custom" id="borderRow" hidden><label>Border colour <button type="button" class="cp" id="colBorder" aria-label="Border colour"></button></label></div>
+    </div>
+
+    <div class="tabpane" data-tabpane="sound" hidden id="soundPane">
+      <div class="form">
+        <label>Sound effects <input type="checkbox" id="chkSound" class="switch" checked></label>
+        <label>Volume <input type="range" class="vol" id="rngVol" min="0" max="100" step="1" value="80" aria-label="Volume"></label>
+      </div>
+      <div class="hint">Moves, captures, checks, castling, promotion and analysis alerts. Press M to mute or unmute.</div>
     </div>
   </div>
 </div>

@@ -4,6 +4,8 @@ import {withOver} from './classification/classify.js';
 import {render} from './ui/board.js';
 import {renderMoves} from './ui/moves.js';
 import {renderLines} from './ui/panels.js';
+import {sfx} from './sound.js';
+import {resetFx} from './ui/fx.js';
 
 /* ---------- PGN parsing (handles chess.com / lichess exports) ---------- */
 // Strips clock comments, {comments}, ;comments, (variations), $NAGs, !? marks, move numbers and results,
@@ -32,11 +34,11 @@ export function parsePgn(text){
 }
 export function loadPgn(){
   const r=parsePgn($('pgn').value);
-  if(r.error){setStatus(r.error);return false}
-  if(!r.moves.length){setStatus('No moves found in PGN.');return false}
+  if(r.error){setStatus(r.error);sfx('error');return false}
+  if(!r.moves.length){setStatus('No moves found in PGN.');sfx('error');return false}
   S.lines=[MAIN];S.line=MAIN;S.sel=null;MAIN.todo=[];
   const key=r.moves.map(m=>m.san).join(' ')+'|'+(r.startFen||'');
-  if(key!==S.pgnKey){S.over={};S.pgnKey=key}
+  if(key!==S.pgnKey){S.over={};S.pgnKey=key;resetFx()}
   S.headers=r.headers||{};
   S.run++;S.moves=r.moves;S.startFen=r.startFen;S.P=[];S.cls=[];S.book=null;S.live=null;S.preview=null;S.done=false;
   S.bookOK=!r.startFen;S.idx=0;S.nextCls=1;

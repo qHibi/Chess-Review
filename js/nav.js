@@ -6,17 +6,21 @@ import {renderMoves} from './ui/moves.js';
 import {renderLines} from './ui/panels.js';
 import {askPromo} from './ui/menu.js';
 import {liveAnalyze,queueLine} from './live.js';
+import {sfx,moveSfx} from './sound.js';
 
 /* ---------- Navigation & variations ----------
    Every line (the game plus each variation) is a full move list with its own evaluations and classifications.
    S.line is the line on screen; S.moves / S.fens / S.P / S.cls always refer to it. */
-export function go(i){
-  let L=S.line;i=Math.max(0,Math.min(L.moves.length,i));
+const stepSfx=()=>{const k=S.idx;if(k>0)moveSfx(S.moves[k-1].san,S.fens[k]);else sfx('tick')};  // sound of the move now on screen
+// silent: no sound (internal use). force: play even if the position did not change (clicking a move in the list).
+export function go(i,silent,force){
+  let L=S.line;const pL=L,pI=S.idx;i=Math.max(0,Math.min(L.moves.length,i));
   while(L.parent&&i<=L.fork)L=L.parent;          // stepping back past a fork returns to the parent line
   S.line=L;S.idx=Math.min(i,L.moves.length);S.preview=null;S.live=null;S.sel=null;
+  if(!silent&&(force||L!==pL||S.idx!==pI))stepSfx();
   render();renderLines();liveAnalyze();
 }
-export function showLine(L,i){S.line=L;go(i)}
+export function showLine(L,i){S.line=L;go(i,false,true)}
 const prefixEq=(X,L,n)=>{for(let k=0;k<n;k++)if(uciOf(X.moves[k])!==uciOf(L.moves[k]))return false;return true};
 export function playMove(mv){
   const L=S.line,i=S.idx,u=uciOf(mv);
@@ -36,6 +40,7 @@ export function playMove(mv){
   if(!T.startFen&&OPEN.ok)computeBook(T);
   S.rLine=T;S.rIdx=i;                                                                  // so the move slides in
   S.line=T;S.idx=T.moves.length;S.preview=null;S.live=null;S.sel=null;
+  moveSfx(mv.san,c.fen());
   renderMoves();render();renderLines();liveAnalyze();queueLine(T);
 }
 export function delLine(X){
@@ -43,7 +48,7 @@ export function delLine(X){
   while(grew){grew=false;S.lines.forEach(Y=>{if(!dead.has(Y)&&dead.has(Y.parent)){dead.add(Y);grew=true}})}
   S.lines=S.lines.filter(Y=>!dead.has(Y));
   if(dead.has(S.line)){S.line=X.parent;S.idx=Math.min(S.idx,X.fork)}
-  S.sel=null;renderMoves();go(S.idx);
+  S.sel=null;renderMoves();go(S.idx,true);
 }
 export function onSquare(sq,ev){
   if(S.preview){S.preview=null;S.sel=null;render();return}
@@ -54,5 +59,6 @@ export function onSquare(sq,ev){
   }
   const p=ch.get(sq);
   S.sel=(p&&p.color===ch.turn()&&S.sel!==sq)?sq:null;
+  if(S.sel)sfx('select');
   render();
 }

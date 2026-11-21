@@ -1,18 +1,27 @@
 import {S,MAIN} from '../state.js';
 import {$} from '../util.js';
-import {CLS} from '../config.js';
+import {CLS,PIECE_URL} from '../config.js';
 import {setBtn} from './svg.js';
 import {iconNode} from './icons.js';
 import {showLine,delLine} from '../nav.js';
 import {openMenu} from './menu.js';
 
+// "e8=Q+" -> text with the promotion piece shown as an icon
+function sanNodes(m){
+  const x=/^(.*?)=([QRBN])(.*)$/.exec(m.san);
+  if(!x)return document.createTextNode(m.san);
+  const f=document.createDocumentFragment(),im=new Image();
+  im.className='pcm';im.alt=x[2];im.draggable=false;im.src=PIECE_URL(m.color,x[2]);
+  im.onerror=()=>im.replaceWith(document.createTextNode(x[2]));
+  f.append(x[1]+'=',im,x[3]);return f;
+}
 export function moveBtn(L,ply,label){
   const m=L.moves[ply-1],b=document.createElement('div');b.className='mvbtn';b.dataset.i=ply;b.dataset.l=L.id;
   const c=L.cls[ply];
   if(c){b.appendChild(iconNode(c.k,'',16));b.title=CLS[c.k].label+' ('+(c.after>0?'+':'')+c.after.toFixed(1)+')'}
   if(c&&c.custom){b.classList.add('edited');b.title=CLS[c.k].label+' (edited)'}
   if(label){const s=document.createElement('span');s.className='vn';s.textContent=label;b.appendChild(s)}
-  b.appendChild(document.createTextNode(m.san));
+  b.appendChild(sanNodes(m));
   const menu=(x,y)=>{showLine(L,ply);openMenu(ply,x,y)};
   b.onclick=()=>{if(Date.now()<S.noClick)return;showLine(L,ply)};
   b.oncontextmenu=e=>{e.preventDefault();menu(e.clientX,e.clientY)};

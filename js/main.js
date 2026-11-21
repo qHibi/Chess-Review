@@ -15,6 +15,7 @@ import {renderMoves} from './ui/moves.js';
 import {renderSummary} from './ui/summary.js';
 import {initImport} from './importer.js';
 import {initSettings} from './settings.js';
+import {initSound} from './sound.js';
 import {hydrateIcons} from './ui/svg.js';
 
 /* ---------- Events ---------- */
@@ -50,7 +51,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='f'||e.key==='F'){S.flip=!S.flip;render()}
 });
 
-hydrateIcons();initSettings();buildThemes();loadOpenings();initImport();
+hydrateIcons();initSettings();initSound();buildThemes();loadOpenings();initImport();
 S.fens=[new Chess().fen()];render();
 getPool(1);
 POOL[0].readyP.then(()=>{if(!S.batch&&!S.deep)setStatus('Engine ready ('+POOL[0].label+').')});
