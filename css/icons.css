@@ -1,0 +1,5 @@
+/* Classification icons. The PNGs are 512x512, so the size is always applied to the <img> itself
+   (via --ico on the wrapper) and never left to the file's natural size. */
+.ico{display:inline-flex;flex:none;align-items:center;justify-content:center;width:var(--ico,16px);height:var(--ico,16px);vertical-align:middle}
+.ico img,.ico i{display:block;width:100%;height:100%;max-width:none;object-fit:contain}
+.ico i{display:grid;place-items:center;border-radius:50%;font:700 calc(var(--ico,16px)*.5)/1 sans-serif;font-style:normal;color:#fff}

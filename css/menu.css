@@ -1,0 +1,7 @@
+.ctx{position:fixed;z-index:100;min-width:190px;max-height:calc(100vh - 16px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+.ctx[hidden]{display:none}
+.ctx-h{font-size:11px;color:var(--mute);padding:6px 10px 4px}
+.ctx-i{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:5px;font-size:14px}
+.ctx-i:hover,.ctx-i:focus-visible{background:var(--line)}
+.ctx-i.on{background:var(--line);font-weight:700}
+.hint{font-size:11px;color:var(--mute);margin-top:6px}

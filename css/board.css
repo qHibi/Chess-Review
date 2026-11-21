@@ -1,0 +1,28 @@
+.boardwrap{display:flex;gap:10px;align-items:stretch}
+.evalbar{width:26px;border-radius:5px;overflow:hidden;background:#1a1a1a;position:relative;flex:none}
+.evalbar .white{position:absolute;left:0;right:0;bottom:0;background:#fff;height:50%;transition:height .35s ease}
+.evalbar.flip .white{bottom:auto;top:0}
+.evalbar span{position:absolute;left:0;right:0;font-size:10px;font-weight:700;text-align:center;padding:3px 0}
+.evalbar .top{top:0;color:#ddd}.evalbar .bot{bottom:0;color:#222}
+.evalbar.flip .top{top:auto;bottom:0;color:#222}.evalbar.flip .bot{bottom:auto;top:0;color:#ddd}
+.col{display:flex;flex-direction:column;gap:8px}
+.board{--size:min(calc(100vw - 70px),640px);width:var(--size);height:var(--size);display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border-radius:4px;position:relative;margin-top:6px}
+.sq{position:relative}
+.sq.l{background:var(--light)}.sq.d{background:var(--dark)}
+.sq .hl{position:absolute;inset:0;opacity:.75}
+.sq img.pc{position:absolute;inset:0;width:100%;height:100%;z-index:2;user-select:none;-webkit-user-drag:none}
+.sq .pc-fb{position:absolute;inset:0;display:grid;place-items:center;font-size:calc(var(--size)/10);z-index:2}
+.sq .co{position:absolute;font-size:10px;font-weight:700;z-index:1}
+.sq.l .co{color:var(--co-l,#6b5a14)}.sq.d .co{color:var(--co-d,#6b5a14)}
+.sq .co.r{top:2px;left:3px}.sq .co.f{bottom:1px;right:3px}
+.badge{position:absolute;z-index:6;width:42%;height:42%;right:-14%;top:-14%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
+.badge img{width:100%;height:100%;display:block}
+.badge i{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;font:700 calc(var(--size)/36)/1 "Schibsted Grotesk",sans-serif;font-style:normal;color:#fff;border:2px solid #fff}
+.verdict{min-height:42px;font-size:15px;padding:8px 12px;background:var(--panel);border-radius:6px;display:flex;gap:10px;align-items:center}
+.verdict img{width:26px;height:26px}
+.verdict b{font-weight:700}
+.board{box-sizing:border-box;border:var(--bw,0px) solid var(--frame,transparent);background:var(--frame,transparent);border-radius:6px}
+.sq{cursor:pointer;touch-action:manipulation}
+.sq.sel::before{content:"";position:absolute;inset:0;background:rgba(20,110,255,.35);z-index:1}
+.sq.dot::after{content:"";position:absolute;left:34%;top:34%;width:32%;height:32%;border-radius:50%;background:rgba(0,0,0,.25);z-index:3;pointer-events:none}
+.sq.cap::after{content:"";position:absolute;inset:4%;border-radius:50%;border:max(3px,.5vw) solid rgba(0,0,0,.28);z-index:3;pointer-events:none}
