@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="css/picker.css">
 <link rel="stylesheet" href="css/icons.css">
 <link rel="stylesheet" href="css/import.css">
+<link rel="stylesheet" href="css/ui.css">
 </head>
 <body>
 <div class="app">
@@ -25,61 +26,51 @@
       <div class="col">
         <div class="board" id="board" aria-label="Chess board"></div>
         <div class="controls">
-          <button id="bStart" title="Start">⏮</button><button id="bPrev" title="Previous (←)">◀</button>
-          <button id="bNext" title="Next (→)">▶</button><button id="bEnd" title="End">⏭</button>
-          <button id="bFlip" title="Flip board (F)">⇅</button>
+          <button id="bStart" title="Start" data-icon="skip-back"></button><button id="bPrev" title="Previous (←)" data-icon="chevron-left"></button>
+          <button id="bNext" title="Next (→)" data-icon="chevron-right"></button><button id="bEnd" title="End" data-icon="skip-forward"></button>
+          <button id="bFlip" title="Flip board (F)" data-icon="flip"></button>
         </div>
-        <div class="verdict" id="verdict">Paste a PGN and press Analyze. Chess.com and Lichess exports work as-is.</div>
+        <div class="verdict" id="verdict">Paste a PGN or import a game, then press Analyze.</div>
       </div>
     </div>
   </div>
 
   <div class="side">
-    <details class="card" id="pgnCard" open>
-      <summary>PGN &amp; settings</summary>
-      <textarea id="pgn" spellcheck="false"></textarea>
-      <div class="row">
-        <label>Depth <select class="sel" id="selDepth"><option value="10">Fast</option><option value="14" selected>Normal</option><option value="16">Deep</option><option value="20">Max</option></select></label>
-        <label>Engines <select class="sel" id="selWorkers"><option value="0" selected>Auto</option><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="6">6</option></select></label>
-        <label title="Reuse the engine's own lines when the played move is one of its suggestions, so fewer positions need a fresh search"><input type="checkbox" id="chkPartial" checked> Partial analysis</label>
-        <label>Strictness <select class="sel" id="selStrict"><option value="1.5">Lenient</option><option value="1" selected>Normal</option><option value="0.7">Strict</option></select></label>
-        <label title="WebAssembly Stockfish is several times faster. If it can't load, the classic JavaScript engine is used automatically">Engine <select class="sel" id="selEngine"><option value="auto" selected>WASM (fast)</option><option value="asm">Classic (JS)</option></select></label>
-        <label title="When the analysis is done, search the whole game again one depth deeper, over and over, re-classifying after every pass"><input type="checkbox" id="chkDeepen" checked> Keep deepening</label>
-        <label>up to depth <select class="sel" id="selMax"><option value="16">16</option><option value="18">18</option><option value="20" selected>20</option><option value="24">24</option><option value="30">30</option></select></label>
+    <div class="top">
+      <div class="brand"><span class="logo" data-icon="microscope" data-size="22"></span><b>Analysis Board</b></div>
+      <button type="button" id="bSettings" data-icon="settings">Settings</button>
+    </div>
+
+    <div class="card" id="importCard">
+      <div class="tabs" role="tablist" aria-label="Import a game">
+        <button type="button" class="tab on" role="tab" data-src="pgn" aria-selected="true">PGN</button>
+        <button type="button" class="tab" role="tab" data-src="lichess" data-icon="lichess" aria-selected="false">Lichess</button>
+        <button type="button" class="tab" role="tab" data-src="chesscom" data-icon="chesscom" aria-selected="false">Chess.com</button>
       </div>
-      </details>
-    <details class="card" id="importCard" open>
-      <summary>Import from Lichess or Chess.com</summary>
-      <div class="row"><select class="sel" id="impSrc" aria-label="Site"><option value="lichess">Lichess</option><option value="chesscom">Chess.com</option></select>
-        <input class="imp-in" id="impUser" placeholder="Username (or Lichess game link)" spellcheck="false" autocomplete="off">
-        <button type="button" class="primary" id="impGo">Load games</button></div>
-      <div class="hint" id="impMsg">No API key needed. Lists the 15 latest games.</div>
-      <div id="impList"></div>
-    </details>
-    <details class="card" id="themeCard">
-      <summary>Appearance</summary>
-      <div class="sub">Website</div><div class="themes" id="siteThemes" role="radiogroup" aria-label="Website theme"></div>
-      <div class="custom"><label>Accent <button type="button" class="cp" id="colAccent" aria-label="Accent colour"></button></label><button type="button" class="mini" id="bResetAccent">Reset</button></div>
-      <div class="sub">Board colours</div><div class="themes" id="themes" role="radiogroup" aria-label="Board theme"></div>
-      <div class="custom" id="customRow" hidden>
-        <label>Light squares <button type="button" class="cp" id="colLight" aria-label="Light square colour"></button></label>
-        <label>Dark squares <button type="button" class="cp" id="colDark" aria-label="Dark square colour"></button></label>
+      <div class="pane" data-pane="pgn">
+        <textarea id="pgn" spellcheck="false" placeholder="Paste a PGN here (Chess.com and Lichess exports work as-is)"></textarea>
       </div>
-      <div class="sub">Pieces</div>
-      <div class="row" style="margin-top:0"><select class="sel" id="selPieces" aria-label="Piece set"></select><span id="piecePrev" style="display:flex"></span></div>
-      <div class="sub">Board border</div><div class="themes" id="borders" role="radiogroup" aria-label="Board border"></div>
-      <div class="custom" id="borderRow" hidden><label>Border colour <button type="button" class="cp" id="colBorder" aria-label="Border colour"></button></label></div>
-    </details>
+      <div class="pane" data-pane="site" hidden>
+        <div class="row">
+          <input class="imp-in" id="impUser" spellcheck="false" autocomplete="off">
+          <button type="button" id="impGo" data-icon="download">Load games</button>
+        </div>
+        <div class="hint" id="impMsg"></div>
+        <div id="impList"></div>
+      </div>
+    </div>
+
     <div class="card">
-      <div class="row">
-        <button class="primary" id="bAnalyze">Analyze game</button>
-        <div class="status" id="status">Loading engine…</div>
+      <div class="row go">
+        <button class="primary" id="bAnalyze" data-icon="play">Analyze game</button>
+        <button type="button" class="chip" id="presetChip" data-icon="sliders" title="Analysis settings"></button>
       </div>
+      <div class="status" id="status">Loading engine…</div>
       <div class="progress"><div id="prog"></div></div>
     </div>
 
     <div class="card">
-      <div class="hd"><h2 id="linesTitle">Engine lines</h2><button type="button" class="mini" id="bPause" hidden> Pause</button></div>
+      <div class="hd"><h2 id="linesTitle">Engine lines</h2><button type="button" class="mini" id="bPause" hidden data-icon="pause">Pause</button></div>
       <div id="lines"></div>
     </div>
 
@@ -95,6 +86,52 @@
       <div id="scores"></div>
       <svg id="graph" viewBox="0 0 300 70" role="img" aria-label="Evaluation graph. Click to jump to a move."></svg>
       <table id="summary"></table>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="settings" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="sh-top">
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab on" role="tab" data-tab="analysis" data-icon="cpu">Analysis</button>
+        <button type="button" class="tab" role="tab" data-tab="appearance" data-icon="palette">Appearance</button>
+      </div>
+      <button type="button" class="mini" id="bCloseSet" title="Close" data-icon="x"></button>
+    </div>
+
+    <div class="tabpane" data-tabpane="analysis">
+      <div class="sub first">Preset</div>
+      <div class="presets" id="presets" role="radiogroup" aria-label="Analysis preset">
+        <button type="button" class="preset" data-preset="fast" data-icon="zap">Fast</button>
+        <button type="button" class="preset" data-preset="normal" data-icon="gauge">Normal</button>
+        <button type="button" class="preset" data-preset="deep" data-icon="microscope">Deep</button>
+        <button type="button" class="preset" data-preset="custom" data-icon="sliders">Custom</button>
+      </div>
+      <div class="hint" id="presetInfo"></div>
+      <div class="form" id="advanced" hidden>
+        <label>Search depth <select class="sel" id="selDepth"><option>8</option><option>10</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option>22</option><option>24</option></select></label>
+        <label title="When the analysis is done, search the whole game again one depth deeper, over and over, re-classifying after every pass">Keep deepening <input type="checkbox" id="chkDeepen" class="switch"></label>
+        <label>Deepen up to <select class="sel" id="selMax"><option>16</option><option>18</option><option>20</option><option>24</option><option>30</option></select></label>
+        <label title="Reuse the engine's own lines when the played move is one of its suggestions, so fewer positions need a fresh search">Partial analysis <input type="checkbox" id="chkPartial" class="switch"></label>
+        <label>Strictness <select class="sel" id="selStrict"><option value="1.5">Lenient</option><option value="1">Normal</option><option value="0.7">Strict</option></select></label>
+        <label>Engines <select class="sel" id="selWorkers"><option value="0">Auto</option><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="6">6</option></select></label>
+        <label title="WebAssembly Stockfish is several times faster. If it can't load, the classic JavaScript engine is used automatically">Engine type <select class="sel" id="selEngine"><option value="auto">WASM (fast)</option><option value="asm">Classic (JS)</option></select></label>
+      </div>
+    </div>
+
+    <div class="tabpane" data-tabpane="appearance" hidden id="themeCard">
+      <div class="sub first">Website</div><div class="themes" id="siteThemes" role="radiogroup" aria-label="Website theme"></div>
+      <div class="custom"><label>Accent <button type="button" class="cp" id="colAccent" aria-label="Accent colour"></button></label><button type="button" class="mini" id="bResetAccent" data-icon="undo">Reset</button></div>
+      <div class="sub">Board colours</div><div class="themes" id="themes" role="radiogroup" aria-label="Board theme"></div>
+      <div class="custom" id="customRow" hidden>
+        <label>Light squares <button type="button" class="cp" id="colLight" aria-label="Light square colour"></button></label>
+        <label>Dark squares <button type="button" class="cp" id="colDark" aria-label="Dark square colour"></button></label>
+      </div>
+      <div class="sub">Pieces</div>
+      <div class="row" style="margin-top:0"><select class="sel" id="selPieces" aria-label="Piece set"></select><span id="piecePrev" style="display:flex"></span></div>
+      <div class="sub">Board border</div><div class="themes" id="borders" role="radiogroup" aria-label="Board border"></div>
+      <div class="custom" id="borderRow" hidden><label>Border colour <button type="button" class="cp" id="colBorder" aria-label="Border colour"></button></label></div>
     </div>
   </div>
 </div>

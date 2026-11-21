@@ -11,7 +11,7 @@ function hex2hsv(hex){
   if(d){h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;h=(h*60+360)%360}
   return{h,s:mx?d/mx:0,v:mx};
 }
-const CP={el:null,h:0,s:0,v:1};
+export const CP={el:null,h:0,s:0,v:1};
 function cpSync(typing){
   const hex=hsv2hex(CP.h,CP.s,CP.v),pop=$('cpop'),W=$('cpWheel').clientWidth||200,c=W/2,a=CP.h*Math.PI/180;
   $('cpKnob').style.left=(c+Math.sin(a)*CP.s*c)+'px';$('cpKnob').style.top=(c-Math.cos(a)*CP.s*c)+'px';
@@ -20,7 +20,7 @@ function cpSync(typing){
   pop.style.setProperty('--c',hex);if(!typing)$('cpHex').value=hex;
   if(CP.el){CP.el.value=hex;if(CP.el.oninput)CP.el.oninput({target:CP.el})}
 }
-function closePicker(){$('cpop').hidden=true;CP.el=null}
+function closePicker(){if(!$('cpop').hidden)CP.closedAt=Date.now();$('cpop').hidden=true;CP.el=null}
 function openPicker(el){
   const pop=$('cpop');
   if(CP.el===el&&!pop.hidden){closePicker();return}

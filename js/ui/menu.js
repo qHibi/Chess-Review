@@ -1,8 +1,9 @@
 import {S} from '../state.js';
 import {$,setStatus} from '../util.js';
-import {CLS,ORDER} from '../config.js';
+import {CLS,ORDER,PIECE_URL} from '../config.js';
 import {classifyAll,withOver} from '../classification/classify.js';
 import {iconNode} from './icons.js';
+import {svgIcon} from './svg.js';
 import {renderMoves} from './moves.js';
 import {renderSummary} from './summary.js';
 import {render} from './board.js';
@@ -33,7 +34,7 @@ export function openMenu(i,x,y){
     m.appendChild(b);
   };
   ORDER.forEach(k=>item(CLS[k].label,k,iconNode(k,'',18)));
-  if(S.over[i])item('Reset to engine result',null);
+  if(S.over[i])item('Reset to engine result',null,svgIcon('undo',18));
   m.hidden=false;
   const w=m.offsetWidth,hh=m.offsetHeight;
   m.style.left=Math.max(8,Math.min(x,innerWidth-w-8))+'px';
@@ -47,7 +48,7 @@ export function askPromo(ev,cands){
   const m=$('ctx');m.replaceChildren();ctxI=-1;ctxAt=Date.now();
   const h=document.createElement('div');h.className='ctx-h';h.textContent='Promote to';m.appendChild(h);
   [['q','Queen'],['r','Rook'],['b','Bishop'],['n','Knight']].forEach(([p,l])=>{
-    const b=document.createElement('button');b.type='button';b.className='ctx-i';b.textContent=l;
+    const b=document.createElement('button');b.type='button';b.className='ctx-i';{const im=new Image();im.alt='';im.width=im.height=24;im.src=PIECE_URL(cands[0].color,p.toUpperCase());b.append(im,l)}
     b.onclick=()=>{closeMenu();S.sel=null;playMove(cands.find(x=>x.promotion===p))};
     m.appendChild(b);
   });

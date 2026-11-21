@@ -51,13 +51,27 @@ async function loadAndAnalyze(pgn,user,white){
   analyze();
 }
 
+const HINT={
+  lichess:{ph:'Lichess username or game link',msg:'No API key needed. Lists the 15 latest games, or paste a game link.'},
+  chesscom:{ph:'Chess.com username',msg:'No API key needed. Lists the 15 latest games.'},
+};
 export function initImport(){
   const msg=t=>{$('impMsg').textContent=t};
-  try{$('impUser').value=localStorage.getItem('chess.impUser')||'';$('impSrc').value=localStorage.getItem('chess.impSrc')||'lichess'}catch(e){}
+  let src='pgn';
+  function pick(s){
+    src=s;
+    document.querySelectorAll('#importCard .tab').forEach(b=>{const on=b.dataset.src===s;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});
+    $('importCard').querySelector('[data-pane=pgn]').hidden=s!=='pgn';
+    $('importCard').querySelector('[data-pane=site]').hidden=s==='pgn';
+    if(s!=='pgn'){$('impUser').placeholder=HINT[s].ph;msg(HINT[s].msg);$('impList').replaceChildren()}
+    try{localStorage.setItem('chess.impSrc',s)}catch(e){}
+  }
+  document.querySelectorAll('#importCard .tab').forEach(b=>b.onclick=()=>pick(b.dataset.src));
+  try{$('impUser').value=localStorage.getItem('chess.impUser')||'';const s=localStorage.getItem('chess.impSrc');if(s&&s!=='pgn'&&HINT[s])pick(s);else pick('pgn')}catch(e){pick('pgn')}
   async function go(){
-    const src=$('impSrc').value,raw=$('impUser').value.trim();
+    const raw=$('impUser').value.trim();
     if(!raw){msg('Enter a username first.');return}
-    try{localStorage.setItem('chess.impUser',raw);localStorage.setItem('chess.impSrc',src)}catch(e){}
+    try{localStorage.setItem('chess.impUser',raw)}catch(e){}
     $('impList').replaceChildren();
     const link=raw.match(/lichess\.org\/(?:game\/export\/)?([A-Za-z0-9]{8})/);
     $('impGo').disabled=true;msg('Loading…');

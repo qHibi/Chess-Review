@@ -1,6 +1,7 @@
 import {S,MAIN} from '../state.js';
 import {$} from '../util.js';
 import {CLS} from '../config.js';
+import {setBtn} from './svg.js';
 import {iconNode} from './icons.js';
 import {showLine,delLine} from '../nav.js';
 import {openMenu} from './menu.js';
@@ -40,7 +41,7 @@ export function renderMoves(){
     const h=document.createElement('div');h.className='var-h';
     const f=X.fork,lab=document.createElement('span');
     lab.textContent=f===0?'Variation from the start':`Variation after ${Math.ceil(f/2)}${f%2?'.':'…'} ${X.parent.moves[f-1].san}`;
-    const x=document.createElement('button');x.type='button';x.textContent='×';x.title='Delete this variation';x.onclick=()=>delLine(X);
+    const x=document.createElement('button');x.type='button';x.title='Delete this variation';setBtn(x,'x',null,14);x.onclick=()=>delLine(X);
     h.append(lab,x);d.appendChild(h);
     const mm=document.createElement('div');mm.className='var-m';
     for(let p=f+1;p<=X.moves.length;p++)mm.appendChild(moveBtn(X,p,p%2?`${(p+1)/2}.`:(p===f+1?`${p/2}…`:'')));

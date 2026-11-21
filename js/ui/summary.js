@@ -2,8 +2,9 @@ import {S,MAIN} from '../state.js';
 import {$} from '../util.js';
 import {CLS,ORDER} from '../config.js';
 import {gameAccuracy,accColor,blendAcc,ratingFromAcc} from '../accuracy.js';
-import {phasesFor,PH_NAME} from '../phase.js';
+import {phasesFor} from '../phase.js';
 import {iconNode} from './icons.js';
+import {svgIcon} from './svg.js';
 import {showLine} from '../nav.js';
 
 function gauge(name,side,r){
@@ -39,19 +40,37 @@ export function updateCursor(){
   const x=(Math.min(S.idx,n)/n*300).toFixed(1);g.setAttribute('x1',x);g.setAttribute('x2',x);
   g.style.display=S.line===MAIN?'':'none';
 }
-// Accuracy and estimated rating for the whole game and for each phase, per side.
+// Estimated rating per side, then accuracy for each phase of the game (opening / middlegame / endgame) as small bars.
+const PHASES=[['open','Opening','book-open'],['mid','Middlegame','zap'],['end','Endgame','flag']];
+const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e};
 function renderScores(ga){
   const box=$('scores');box.replaceChildren();
-  const ph=phasesFor(MAIN),rows=[['Whole game',null],[PH_NAME.open,'open'],[PH_NAME.mid,'mid'],[PH_NAME.end,'end']];
-  const cell=(col,key)=>{
+  const ph=phasesFor(MAIN);
+  const stat=(col,key)=>{
     const d=ga.data[col].filter(x=>!key||ph[x.i]===key),r=key?blendAcc(d):ga[col];
-    return r?`${r.acc.toFixed(1)}% · ${ratingFromAcc(r.acc)}`:'–';
+    return r?{acc:r.acc,rating:ratingFromAcc(r.acc)}:null;
   };
-  const sub=document.createElement('div');sub.className='sub';sub.textContent='Game rating (estimated)';
-  const t=document.createElement('table');
-  t.innerHTML='<tr><th></th><th>White</th><th>Black</th></tr>'+rows.map(([l,k])=>`<tr><td>${l}</td><td>${cell('w',k)}</td><td>${cell('b',k)}</td></tr>`).join('');
-  const hint=document.createElement('div');hint.className='hint';hint.textContent='Accuracy · estimated rating. Phases are split by material and development.';
-  box.append(sub,t,hint);
+  const rates=el('div','rates');
+  [['w','White'],['b','Black']].forEach(([c,side])=>{
+    const s=stat(c,null),card=el('div','rate');
+    const lab=el('div','rl');lab.append(svgIcon('trophy',14),el('span','','Est. rating'));
+    card.append(lab,el('div','rv'+(s?'':' none'),s?String(s.rating):'–'),el('div','rs',(s?s.acc.toFixed(1)+'% accuracy':'no data')+' · '+side));
+    rates.appendChild(card);
+  });
+  const grid=el('div','phs');
+  grid.append(el('span'),el('span','ph-h','White'),el('span','ph-h','Black'));
+  PHASES.forEach(([key,name,ic])=>{
+    const l=el('span','ph-l');l.append(svgIcon(ic,15),el('span','',name));grid.appendChild(l);
+    ['w','b'].forEach(c=>{
+      const s=stat(c,key),cell=el('span','ph-c'+(s?'':' none'));
+      if(s){
+        const bar=el('span','bar'),f=el('i');f.style.width=Math.max(3,s.acc)+'%';f.style.background=accColor(s.acc);bar.appendChild(f);
+        cell.append(bar,el('b','',Math.round(s.acc)+'%'),el('small','','~'+s.rating));
+      }else cell.textContent='–';
+      grid.appendChild(cell);
+    });
+  });
+  box.append(rates,grid,el('div','hint','Ratings are rough estimates from accuracy, not real Elo. Phases are split by material and development.'));
 }
 export function renderSummary(){
   const t=$('summary');t.replaceChildren();

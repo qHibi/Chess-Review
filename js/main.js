@@ -14,11 +14,11 @@ import {render} from './ui/board.js';
 import {renderMoves} from './ui/moves.js';
 import {renderSummary} from './ui/summary.js';
 import {initImport} from './importer.js';
+import {initSettings} from './settings.js';
+import {hydrateIcons} from './ui/svg.js';
 
 /* ---------- Events ---------- */
 $('bAnalyze').onclick=analyze;
-$('selDepth').onchange=e=>{CFG.depth=+e.target.value};
-$('chkPartial').onchange=e=>{CFG.partial=e.target.checked};
 $('pgn').onchange=()=>{if(!S.batch)loadPgn()};
 $('selStrict').onchange=e=>{
   CFG.strict=+e.target.value;
@@ -34,7 +34,6 @@ $('bPause').onclick=()=>{
   if(S.paused){POOL.forEach(e=>e.halt());setStatus('Paused.')}else resumeAll();
 };
 $('chkDeepen').onchange=e=>{CFG.deepen=e.target.checked;if(!CFG.deepen&&S.deep){S.deep=false;S.paused=false;resumeAll();syncPause();setStatus('Stopped deepening.')}};
-$('selMax').onchange=e=>{CFG.maxDepth=+e.target.value};
 $('selEngine').onchange=()=>{        // switch engines: throw the old workers away and start over
   S.run++;S.batch=false;S.deep=false;S.paused=false;resumeAll();$('bAnalyze').disabled=false;$('prog').style.width='0';syncPause();
   POOL.splice(0).forEach(e=>e.kill());resetAux();
@@ -51,7 +50,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='f'||e.key==='F'){S.flip=!S.flip;render()}
 });
 
-buildThemes();loadOpenings();initImport();
+hydrateIcons();initSettings();buildThemes();loadOpenings();initImport();
 S.fens=[new Chess().fen()];render();
 getPool(1);
 POOL[0].readyP.then(()=>{if(!S.batch&&!S.deep)setStatus('Engine ready ('+POOL[0].label+').')});

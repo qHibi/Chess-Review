@@ -1,6 +1,7 @@
 import {S,MAIN,withLine} from './state.js';
 import {$,setStatus} from './util.js';
 import {CFG} from './config.js';
+import {setBtn} from './ui/svg.js';
 import {POOL,getPool,workerCount,terminal} from './engine.js';
 import {classifyAll,classify,withOver} from './classification/classify.js';
 import {derive} from './derive.js';
@@ -35,7 +36,7 @@ async function searchGate(w,fen,depth,run){
     if(!r.stopped)return r.lines;
   }
 }
-export function syncPause(){const on=S.batch||S.deep;$('bPause').hidden=!on;$('bPause').textContent=S.paused?'▶ Resume':'⏸ Pause'}
+export function syncPause(){const on=S.batch||S.deep;$('bPause').hidden=!on;setBtn($('bPause'),S.paused?'play':'pause',S.paused?'Resume':'Pause')}
 const bookNote=()=>'Book: '+(S.bookSrc==='openings'?'openings.txt':'built-in list (openings.txt not found)');
 export async function analyze(){
   if(S.batch)return;
@@ -43,7 +44,6 @@ export async function analyze(){
   S.paused=false;resumeAll();S.deep=false;
   if(!loadPgn())return;
   const run=++S.run;S.batch=true;$('bAnalyze').disabled=true;syncPause();
-  if(matchMedia('(max-width:980px)').matches)$('pgnCard').open=false;
   setStatus('Checking opening book…');
   const M=MAIN;
   await fetchBook(M);
