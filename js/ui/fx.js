@@ -19,7 +19,7 @@ const FILES='abcdefgh';
 const reduced=()=>!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
 export const FX={on:true};
 let seen=new Set(),cur='',st=null;
-export function setFx(on){FX.on=!!on;try{localStorage.setItem('chess.fx',on?'1':'0')}catch(e){}cur='';st=null}
+export function setFx(on){FX.on=!!on;try{document.documentElement.classList.toggle('calm',!FX.on)}catch(e){}try{localStorage.setItem('chess.fx',on?'1':'0')}catch(e){}cur='';st=null}
 export function resetFx(){seen=new Set();cur='';st=null}        // new game / new analysis: every entrance may play once again
 
 /* ---- small DOM helpers ---- */
@@ -131,18 +131,21 @@ export function mateLanes(ch){
 
 /* ---- tactics of the move just played (position after the move) ---- */
 const V={p:1,n:3,b:3,r:5,q:9,k:100};
-const attackers=(b,color,f,r)=>{
+const attackers=(b,color,f,r,skip)=>{
   const out=[];
   for(let y=0;y<8;y++)for(let x=0;x<8;x++){
-    const p=b[y][x];if(!p||p.color!==color||(x===f&&y===r))continue;
+    const p=b[y][x];if(!p||p.color!==color||(x===f&&y===r)||(skip&&x===skip[0]&&y===skip[1]))continue;
     if(reach(b,x,y).some(h=>h.f===f&&h.r===r))out.push({f:x,r:y,type:p.type});
   }
   return out;
 };
 const S_=(f,r)=>({f,r,kind:'src'}),T_=(f,r)=>({f,r,kind:'tgt'}),L_=([f,r])=>({f,r,kind:'lane'});
+const boardOf=fen=>{try{return fen?new Chess(fen).board():null}catch(e){return null}};
 
-// the moved piece attacks two or more enemy pieces that are worth winning (bigger than it, undefended, or the king), and is itself safe
-export function forkOf(ch,mv){
+/* A fork: the moved piece attacks two or more enemy pieces worth winning (bigger than it, undefended, or the king) and cannot
+   simply be taken. Duplicates are removed: a target that this piece was already attacking before the move does not count, so a
+   queen sliding along a line it already controlled is not a "new" fork. `prev` = the position before the move. */
+export function forkOf(ch,mv,prev){
   const b=ch.board(),[tf,tr]=pos(mv.to),p=b[tr][tf];
   if(!p||p.type==='k')return null;
   const me=p.color,foe=me==='w'?'b':'w',val=V[p.type];
@@ -151,32 +154,53 @@ export function forkOf(ch,mv){
     const low=Math.min(...hit.map(a=>V[a.type]));
     if(low<val||!attackers(b,me,tf,tr).length)return null;           // it can just be taken
   }
+  const pb=prev?prev.board():null,[f0,r0]=pos(mv.from);
+  const had=new Set();
+  if(pb&&pb[r0]&&pb[r0][f0])reach(pb,f0,r0).forEach(h=>{const q=pb[h.r][h.f];if(q&&q.color===foe)had.add(h.f+','+h.r)});
   const groups=[];
   reach(b,tf,tr).forEach(h=>{
-    const q=b[h.r][h.f];if(!q||q.color!==foe||q.type==='p')return;
+    const q=b[h.r][h.f];if(!q||q.color!==foe||q.type==='p'||had.has(h.f+','+h.r))return;
     if(q.type==='k'||V[q.type]>val||!attackers(b,foe,h.f,h.r).length)groups.push([S_(tf,tr),...h.path.map(L_),T_(h.f,h.r)]);
   });
   return groups.length>=2?{kind:'fork',groups}:null;
 }
-// the moved bishop / rook / queen pins an enemy piece against the king or a bigger piece
-export function pinOf(ch,mv){
-  const b=ch.board(),[tf,tr]=pos(mv.to),p=b[tr][tf];
-  if(!p||!'brq'.includes(p.type))return null;
-  const dirs=p.type==='b'?B_DIRS:p.type==='r'?R_DIRS:RING,groups=[];
-  dirs.forEach(([dx,dy])=>{
-    let x=tf+dx,y=tr+dy;const seq=[];let pin=null;
-    while(inb(x,y)){
-      const q=b[y][x];
-      if(!q)seq.push(L_([x,y]));
-      else if(!pin){if(q.color===p.color||q.type==='k')break;pin=[x,y,q];seq.push(T_(x,y))}
-      else{
-        if(q.color!==p.color&&'krq'.includes(q.type)&&V[q.type]>V[pin[2].type])groups.push([S_(tf,tr),...seq,T_(x,y)]);
-        break;
+
+/* Every pin `color` has on the board: a bishop / rook / queen, one enemy piece in front of it on the line, and behind that
+   - the king, or
+   - a piece that is worth clearly more (the pinned piece is lower, and the one behind is a rook or queen), or
+   - a piece of equal value that nothing protects (otherwise moving the front piece just offers a trade).
+   Pinning something to a piece that is worth less or the same and defended is not a pin worth showing. */
+function pinsIn(b,color){
+  const out=[],foe=color==='w'?'b':'w';
+  for(let y0=0;y0<8;y0++)for(let x0=0;x0<8;x0++){
+    const p=b[y0][x0];if(!p||p.color!==color||!'brq'.includes(p.type))continue;
+    (p.type==='b'?B_DIRS:p.type==='r'?R_DIRS:RING).forEach(([dx,dy])=>{
+      let x=x0+dx,y=y0+dy,front=null;const seq=[];
+      while(inb(x,y)){
+        const q=b[y][x];
+        if(!q)seq.push(L_([x,y]));
+        else if(!front){if(q.color!==foe||q.type==='k')return;front=[x,y,q];seq.push(T_(x,y))}
+        else{
+          if(q.color===foe){
+            const vf=V[front[2].type],vb=V[q.type];
+            const ok=q.type==='k'||(vb>vf&&vb>=5)||(vb===vf&&vb>=3&&!attackers(b,foe,x,y,[front[0],front[1]]).length);
+            if(ok)out.push({key:`${front[0]},${front[1]}>${x},${y}`,group:[S_(x0,y0),...seq,T_(x,y)]});
+          }
+          return;
+        }
+        x+=dx;y+=dy;
       }
-      x+=dx;y+=dy;
-    }
-  });
-  return groups.length?{kind:'pin',groups}:null;
+    });
+  }
+  return out;
+}
+// Only pins the move just created: a pin that already existed before it (same pinned piece, same piece behind) is a duplicate,
+// so a rook stepping back along its own pin line does not set the effect off again.
+export function pinOf(ch,mv,prev){
+  const now=pinsIn(ch.board(),mv.color),pb=prev?prev.board():null;
+  const before=new Set(pb?pinsIn(pb,mv.color).map(q=>q.key):[]);
+  const fresh=now.filter(q=>!before.has(q.key));
+  return fresh.length?{kind:'pin',groups:fresh.map(q=>q.group)}:null;
 }
 // check given by a piece other than the one that moved (the move uncovered it)
 export function discoveredOf(ch,mv){
@@ -192,7 +216,7 @@ export function discoveredOf(ch,mv){
   }
   return groups.length?{kind:'disc',groups}:null;
 }
-export const tacticOf=(ch,mv)=>discoveredOf(ch,mv)||forkOf(ch,mv)||pinOf(ch,mv);
+export const tacticOf=(ch,mv,prev)=>discoveredOf(ch,mv)||forkOf(ch,mv,prev)||pinOf(ch,mv,prev);
 
 /* ---- the effects ----
    mode: 2 = play the entrance, 1 = draw the finished state (same visit, e.g. flipping the board), 0 = draw nothing */
@@ -294,7 +318,8 @@ function build(low,top,stage,same,brill){
     else{
       if(brill&&mode('brilliant')===2)brilliant(low,top,stage,mv.to);
       if(san.includes('=')){const m=mode('promo');if(m===2)promotion(low,top,mv)}
-      else{const t=tacticOf(ch,mv);if(t)tactic(low,top,t,mv,mode(t.kind))}
+      else{let prev=null;try{prev=new Chess(S.fens[S.idx-1])}catch(e){}
+        const t=tacticOf(ch,mv,prev);if(t)tactic(low,top,t,mv,mode(t.kind))}
     }
   }catch(e){}
 }

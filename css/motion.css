@@ -1,0 +1,52 @@
+/* ---------- Interface motion: short (under ~0.3 s), transform / opacity only, so it stays light ----------
+   Everything here is switched off by Settings > Appearance > "Board effects and UI motion" (html.calm) and by prefers-reduced-motion. */
+@keyframes screenIn{from{opacity:0;transform:translateY(8px)}}
+@keyframes cardIn{from{opacity:0;transform:translateY(10px)}}
+@keyframes menuIn{from{opacity:0;transform:scale(.95)}}
+@keyframes sheetIn{from{opacity:0;transform:translateY(10px) scale(.97)}}
+@keyframes selPop{50%{transform:scale(1.06)}}
+@keyframes mvOn{from{background-color:rgba(255,255,255,.25)}}
+
+/* screens: the whole screen fades up, then its cards follow one after another */
+.import-screen,.app{animation:screenIn .22s ease-out both}
+.imp-wrap>*,.side>.card,.side>.top,.col>.controls{animation:cardIn .28s cubic-bezier(.2,.7,.3,1) both}
+.imp-wrap>:nth-child(2){animation-delay:.03s}.imp-wrap>:nth-child(3){animation-delay:.06s}.imp-wrap>:nth-child(4){animation-delay:.09s}.imp-wrap>:nth-child(5){animation-delay:.12s}.imp-wrap>:nth-child(6){animation-delay:.15s}
+.side>.card:nth-of-type(1){animation-delay:.04s}.side>.card:nth-of-type(2){animation-delay:.08s}.side>.card:nth-of-type(3){animation-delay:.12s}
+.col>.controls{animation-delay:.05s}
+
+/* buttons: press feedback and gentle hover */
+button{transition:transform .12s ease,background-color .15s,border-color .15s,color .15s,box-shadow .15s,filter .15s}
+button:not(:disabled):active{transform:scale(.95)}
+button.primary:hover{filter:brightness(1.08)}
+.controls button:hover{background:var(--line)}
+.tab{transition:background-color .18s,color .18s,box-shadow .18s}
+
+/* settings sheet, tab panes, context menu, promotion picker */
+.modal:not([hidden]){animation:fadein .15s ease both}
+.modal:not([hidden]) .sheet{animation:sheetIn .2s cubic-bezier(.2,.8,.3,1) both}
+.tabpane:not([hidden]){animation:fadein .18s ease both}
+.ctx:not([hidden]){animation:menuIn .12s ease-out both;transform-origin:top left}
+.ctx-i.promo-i{transition:transform .12s,background-color .15s,border-color .15s}
+.ctx-i.promo-i:hover{transform:scale(1.08)}
+.preset{transition:transform .12s,color .15s,border-color .15s,box-shadow .15s}
+.preset.on{animation:selPop .2s ease}
+
+/* lists */
+.imp-g{animation:cardIn .22s ease both;transition:transform .12s,border-color .15s,background-color .15s}
+.imp-g:hover{transform:translateX(3px)}
+.imp-g:nth-child(2){animation-delay:.02s}.imp-g:nth-child(3){animation-delay:.04s}.imp-g:nth-child(4){animation-delay:.06s}.imp-g:nth-child(5){animation-delay:.08s}.imp-g:nth-child(n+6){animation-delay:.1s}
+.mvbtn{transition:background-color .15s,transform .1s}
+.mvbtn:active{transform:scale(.95)}
+.mvbtn.on{animation:mvOn .25s ease-out}
+#summaryCard:not([hidden]){animation:cardIn .35s ease both}
+.status{transition:opacity .2s}
+
+/* board: a selected piece lifts a little */
+.sq img.pc{transition:scale .12s ease}
+.sq.sel img.pc{scale:1.08}
+.sq:hover img.pc:not(.sliding){scale:1.03}
+.sq.sel:hover img.pc{scale:1.08}
+
+/* calm: no interface motion at all */
+html.calm *,html.calm *::before,html.calm *::after{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}

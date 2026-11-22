@@ -3,7 +3,7 @@ import {setBtn} from './ui/svg.js';
 
 /* ---------- Sound effects ----------
    Moves use the Chess.com sound files, loaded straight from their CDN: move-self, capture, castle, promote, move-check and
-   game-end (checkmate / stalemate / draw), plus notify for "analysis complete". One sound per move, picked in moveSfx().
+   game-end (checkmate / stalemate only: repetition, 50-move and insufficient-material draws are quiet), plus notify for "analysis complete". One sound per move, picked in moveSfx().
    If a file can't be loaded (offline, blocked, format not supported) the same sound is synthesised with the Web Audio API instead.
    Small UI sounds (clicks, toggles, piece selection, errors) are always synthesised.
    Browsers keep audio locked until the person has interacted with the page, so nothing plays before the first click / key press.
@@ -151,6 +151,32 @@ const SOUNDS={
     tone(t,{f:780,f2:520,vol:.16,dur:.07});
     tone(t+.05,{f:520,f2:360,vol:.12,dur:.08});
   },
+  tab:t=>{
+    tone(t,{f:900,f2:1200,type:'triangle',vol:.09,dur:.04});
+    noise(t,{vol:.05,dur:.015,f:3500,q:1});
+  },
+  pick:t=>{
+    tone(t,{f:520,f2:760,vol:.13,dur:.06});
+    tone(t+.045,{f:1040,vol:.07,dur:.07});
+  },
+  whoosh:t=>{                                         // a quick air sweep for changing screens
+    const s=ctx.createBufferSource(),fl=ctx.createBiquadFilter(),g=ctx.createGain();
+    s.buffer=noiseBuf;fl.type='bandpass';fl.Q.value=.8;
+    fl.frequency.setValueAtTime(500,t);fl.frequency.exponentialRampToValueAtTime(3200,t+.14);
+    env(g,t,.16,.03,.16);s.connect(fl);fl.connect(g);g.connect(master);s.start(t,Math.random()*.4);s.stop(t+.2);
+  },
+  open:t=>{
+    tone(t,{f:420,f2:640,type:'triangle',vol:.1,dur:.07});
+    tone(t+.04,{f:640,f2:860,type:'triangle',vol:.08,dur:.07});
+  },
+  close:t=>{
+    tone(t,{f:640,f2:420,type:'triangle',vol:.1,dur:.07});
+    tone(t+.04,{f:420,f2:300,type:'triangle',vol:.07,dur:.07});
+  },
+  flip:t=>{
+    tone(t,{f:300,f2:620,type:'triangle',vol:.1,dur:.09});
+    noise(t,{vol:.07,dur:.05,f:2000,q:.8});
+  },
   error:t=>{
     tone(t,{f:180,f2:140,type:'triangle',vol:.3,dur:.12});
     tone(t+.13,{f:160,f2:120,type:'triangle',vol:.3,dur:.16});
@@ -185,7 +211,7 @@ export function moveSfx(san,fenAfter){
   const s=san||'';let n=null;
   if(s.endsWith('#'))n='mate';
   else if(fenAfter){
-    try{const c=new Chess(fenAfter);if(c.game_over()&&!c.in_checkmate())n='draw'}catch(e){}
+    try{const c=new Chess(fenAfter);if(c.in_stalemate())n='draw'}catch(e){}
   }
   if(!n)n=s.endsWith('+')?'check':s.includes('=')?'promote':/^O-O/.test(s)?'castle':s.includes('x')?'capture':'move';
   sfx(n);
@@ -226,9 +252,14 @@ export function initSound(){
   }
   paint();
 
+  // Which small sound each control makes (first match wins); null = silent because something else already plays
+  const UI=[['#bAnalyze',null],['#bNew','whoosh'],['#bResume','whoosh'],['#bFlip','flip'],['#bSettings,#bSettings2,#presetChip','open'],
+    ['#bCloseSet','close'],['.tab','tab'],['.preset','pick'],['.imp-g','pick'],['.cp','pick']];
   document.addEventListener('click',e=>{
     const t=e.target.closest&&e.target.closest('button');
     if(!t||t.disabled||NAV.has(t.id)||t.closest('#ctx'))return;
+    const hit=UI.find(([sel])=>t.matches(sel));
+    if(hit){if(hit[1])sfx(hit[1]);return}
     sfx('click');
   });
   document.addEventListener('change',e=>{

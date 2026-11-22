@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="css/icons.css">
 <link rel="stylesheet" href="css/import.css">
 <link rel="stylesheet" href="css/ui.css">
+<link rel="stylesheet" href="css/motion.css">
 </head>
 <body data-screen="import">
 <div class="import-screen" id="importScreen">
@@ -153,9 +154,9 @@
       <div class="row" style="margin-top:0"><select class="sel" id="selPieces" aria-label="Piece set"></select><span id="piecePrev" style="display:flex"></span></div>
       <div class="sub">Board border</div><div class="themes" id="borders" role="radiogroup" aria-label="Board border"></div>
       <div class="custom" id="borderRow" hidden><label>Border colour <button type="button" class="cp" id="colBorder" aria-label="Border colour"></button></label></div>
-      <div class="sub">Board effects</div>
-      <div class="form fxform"><label>Effects <input type="checkbox" id="chkFx" class="switch" checked></label></div>
-      <div class="hint">Brilliant, checkmate, stalemate, promotion, forks, pins and discovered checks light up the board once per analysis. Turn this off on slower devices.</div>
+      <div class="sub">Effects &amp; animations</div>
+      <div class="form fxform"><label>Board effects and UI motion <input type="checkbox" id="chkFx" class="switch" checked></label></div>
+      <div class="hint">Brilliant, checkmate, stalemate, promotion, forks, pins and discovered checks light up the board once per analysis. Turning this off also calms the interface animations, which helps on slower devices.</div>
     </div>
 
     <div class="tabpane" data-tabpane="sound" hidden id="soundPane">

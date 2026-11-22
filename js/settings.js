@@ -75,7 +75,7 @@ export function initSettings(){
   $('bSettings').onclick=()=>open('analysis');
   $('bSettings2').onclick=()=>open('analysis');
   try{FX.on=localStorage.getItem('chess.fx')!=='0'}catch(e){}
-  $('chkFx').checked=FX.on;
+  $('chkFx').checked=FX.on;document.documentElement.classList.toggle('calm',!FX.on);
   $('chkFx').onchange=e=>{setFx(e.target.checked);render()};
   $('presetChip').onclick=()=>open('analysis');
   $('bCloseSet').onclick=close;
