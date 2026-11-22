@@ -2,190 +2,230 @@ import {S} from '../state.js';
 import {$} from '../util.js';
 
 /* ---------- Board effects ----------
-   A transparent layer (#fx) sits on top of the board and shows effects for the move on screen:
-     brilliant  blue flash + shake + sparks        great      blue ripple
-     blunder    red vignette + small shake         mistake / miss   orange / red ripple
-     check      red ripples on the king            checkmate  the attacking line(s) drawn onto the king + a red badge
-     stalemate  grey squares closing in around the king      promotion  gold sparkle burst
-   Every effect has an animated entrance and a still "end state" (glow, line, grey squares...).
-   The entrance plays once per effect per analysis; whenever you come back to that move only the end state is drawn.
-   The layer is separate from the board squares, so the many re-renders during analysis never restart an animation. */
-const FILES='abcdefgh',NS='http://www.w3.org/2000/svg';
+   Only four moments get a special effect - everything is flat colour, no gradients or glows:
+     brilliant    full-board blue flash + shake + blue ripples
+     promotion    gold ripple + sparkles
+     checkmate    every square the winning side uses against the king turns red: the checking line, the pieces that
+                  support the checker, the pieces that cut off the king's escape squares and the pieces that pin a
+                  defender to the king (the squares of the move just played are left alone). Then the mated king is
+                  turned over and gets a "#" badge.
+     stalemate    grey squares close in around the king one by one, then a "=" badge
+   The effects sit UNDER the pieces and the classification badge (z-index in css/fx.css), so nothing hides them.
+   The entrance animation plays once per effect per analysis; coming back to the move shows only the finished state.
+   The layers are separate from the board squares, so the many re-renders during analysis never restart an animation. */
+const FILES='abcdefgh';
 const reduced=()=>!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
-let seen=new Set(),cur='';
-export function resetFx(){seen=new Set();cur=''}          // new game / new analysis: every entrance may play once again
+let seen=new Set(),cur='',st=null;
+export function resetFx(){seen=new Set();cur='';st=null}        // new game / new analysis: every entrance may play once again
 
 /* ---- small DOM helpers ---- */
-const el=(tag,cls,parent,style)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(style)e.style.cssText=style;if(parent)parent.appendChild(e);return e};
-const sv=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e};
+const el=(cls,parent,style)=>{const e=document.createElement('div');e.className=cls;if(style)e.style.cssText=style;if(parent)parent.appendChild(e);return e};
 const gone=e=>{e.addEventListener('animationend',()=>e.remove(),{once:true});return e};
-const colRow=n=>{const f=FILES.indexOf(n[0]),r=8-(+n[1]);return[S.flip?7-f:f,S.flip?7-r:r]};   // square name -> screen column/row
-const cell=(L,c,r,cls)=>el('div','fx-sq '+cls,L,`left:${c*12.5}%;top:${r*12.5}%`);
-const sq=(L,name,cls)=>{const[c,r]=colRow(name);return cell(L,c,r,cls)};
-const ctr=n=>{const[c,r]=colRow(n);return[c*100+50,r*100+50]};                                // centre in the 800x800 SVG space
-const D=(e,s)=>{e.style.animationDelay=s+'s';return e};
+const nameOf=(f,r)=>FILES[f]+(8-r);                                     // board coords (file, rank counted from the top) -> "e4"
+const pos=n=>[FILES.indexOf(n[0]),8-(+n[1])];
+const scr=(f,r)=>[S.flip?7-f:f,S.flip?7-r:r];                           // board coords -> screen column/row
+const cellScr=(L,c,r,cls,delay)=>{
+  const e=el('fx-sq '+cls,L,`left:${c*12.5}%;top:${r*12.5}%`);
+  if(delay!=null)e.style.animationDelay=delay.toFixed(2)+'s';
+  return e;
+};
+const cell=(L,name,cls,delay)=>{const[f,r]=pos(name),[c,rr]=scr(f,r);return cellScr(L,c,rr,cls,delay)};
 
-/* ---- chess helpers ---- */
-function kingOf(ch,color){
-  const b=ch.board();
-  for(let r=0;r<8;r++)for(let f=0;f<8;f++){const p=b[r][f];if(p&&p.type==='k'&&p.color===color)return FILES[f]+(8-r)}
-  return null;
-}
-// every piece of `color` that attacks `target`, with the squares in between (for sliders)
-function attackers(ch,target,color){
-  const b=ch.board(),tf=FILES.indexOf(target[0]),tr=8-(+target[1]),out=[];
-  for(let r=0;r<8;r++)for(let f=0;f<8;f++){
-    const p=b[r][f];if(!p||p.color!==color)continue;
-    const dx=tf-f,dy=tr-r,ax=Math.abs(dx),ay=Math.abs(dy),t=p.type;let ok=false;const path=[];
-    if(t==='n')ok=(ax===1&&ay===2)||(ax===2&&ay===1);
-    else if(t==='k')ok=Math.max(ax,ay)===1;
-    else if(t==='p')ok=ax===1&&dy===(color==='w'?-1:1);
-    else{
-      const diag=ax===ay&&ax>0,line=(dx===0||dy===0)&&ax+ay>0;
-      ok=t==='b'?diag:t==='r'?line:(diag||line);
-      if(ok){
-        const sx=Math.sign(dx),sy=Math.sign(dy);let x=f+sx,y=r+sy;
-        while(x!==tf||y!==tr){if(b[y][x]){ok=false;break}path.push(FILES[x]+(8-y));x+=sx;y+=sy}
+/* ---- chess geometry (works on chess.js board(): board[0] is rank 8, board[r][f] = {type,color} or null) ---- */
+const B_DIRS=[[1,1],[1,-1],[-1,1],[-1,-1]],R_DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
+const N_OFF=[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+const RING=[[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];       // the 8 neighbours, clockwise from "up"
+const inb=(f,r)=>f>=0&&f<8&&r>=0&&r<8;
+
+// Squares the piece on (f,r) attacks, each with the squares strictly between (for sliders).
+// `ghost` is a square treated as empty, so a checking line carries on through the king (the square behind the king is covered too).
+function reach(b,f,r,ghost){
+  const p=b[r][f],t=p.type,out=[];
+  const push=(x,y,path)=>out.push({f:x,r:y,path});
+  if(t==='n'||t==='k'){(t==='n'?N_OFF:RING).forEach(([dx,dy])=>{if(inb(f+dx,r+dy))push(f+dx,r+dy,[])})}
+  else if(t==='p'){const dy=p.color==='w'?-1:1;[-1,1].forEach(dx=>{if(inb(f+dx,r+dy))push(f+dx,r+dy,[])})}
+  else{
+    (t==='b'?B_DIRS:t==='r'?R_DIRS:RING).forEach(([dx,dy])=>{
+      let x=f+dx,y=r+dy;const path=[];
+      while(inb(x,y)){
+        push(x,y,path.slice());
+        if(b[y][x]&&!(ghost&&x===ghost[0]&&y===ghost[1]))break;
+        path.push([x,y]);x+=dx;y+=dy;
       }
-    }
-    if(ok)out.push({sq:FILES[f]+(8-r),type:t,path});
+    });
   }
   return out;
 }
+// Could the piece on (f,r) move onto one of the squares in `set` ("f,r" strings) if it were not pinned?
+function canGo(b,f,r,set){
+  const p=b[r][f];
+  if(p.type==='p'){
+    const dy=p.color==='w'?-1:1,start=p.color==='w'?6:1;
+    if(inb(f,r+dy)&&!b[r+dy][f]){
+      if(set.has(f+','+(r+dy)))return true;
+      if(r===start&&!b[r+2*dy][f]&&set.has(f+','+(r+2*dy)))return true;
+    }
+    return[-1,1].some(dx=>inb(f+dx,r+dy)&&b[r+dy][f+dx]&&b[r+dy][f+dx].color!==p.color&&set.has((f+dx)+','+(r+dy)));
+  }
+  return reach(b,f,r).some(m=>{const q=b[m.r][m.f];return set.has(m.f+','+m.r)&&!(q&&q.color===p.color)});
+}
 
-/* ---- effect pieces ---- */
-const glow=(L,name,cls)=>sq(L,name,'fx-glow '+cls);                                  // still end-state ring on a square
-const ripple=(L,name,cls,delays)=>delays.forEach(d=>gone(D(sq(L,name,'fx-ripple '+cls),d)));
+/* Everything the winning side is using against the mated king, as groups of squares (a piece's own square, then the squares
+   its line passes over towards the target). kind 'src' = the attacking piece, 'lane' = a square it attacks on the way. */
+export function mateLanes(ch){
+  const b=ch.board(),loser=ch.turn(),win=loser==='w'?'b':'w';
+  let K=null;const W=[];
+  for(let r=0;r<8;r++)for(let f=0;f<8;f++){
+    const p=b[r][f];if(!p)continue;
+    if(p.type==='k'&&p.color===loser)K=[f,r];else if(p.color===win)W.push({f,r,type:p.type});
+  }
+  if(!K)return null;
+  const at=(h,x,y)=>h.f===x&&h.r===y;
+  const src=w=>({f:w.f,r:w.r,kind:'src'}),lane=([f,r])=>({f,r,kind:'lane'});
+  const direct=W.map(w=>({w,hits:reach(b,w.f,w.r)}));
+  const checkers=direct.filter(d=>d.hits.some(h=>at(h,K[0],K[1])));
+  const ghosted=W.map(w=>({w,hits:reach(b,w.f,w.r,K)}));
+  const groups=[];
+
+  // 1. the checking line(s)
+  checkers.forEach(d=>{const h=d.hits.find(h=>at(h,K[0],K[1]));groups.push([src(d.w),...h.path.map(lane)])});
+
+  // 2. cutting the king off: every piece that covers one of its escape squares. A neighbouring square holding a white piece
+  //    counts too - covering it is what stops the king capturing it, so this is also where a supporter of the checker shows up
+  //    (a bishop behind a queen, say).
+  RING.forEach(([dx,dy])=>{
+    const x=K[0]+dx,y=K[1]+dy;if(!inb(x,y))return;
+    const q=b[y][x];if(q&&q.color===loser)return;                     // its own piece already blocks that square
+    ghosted.forEach(({w,hits})=>{
+      const h=hits.find(h=>at(h,x,y));if(!h)return;
+      groups.push([src(w),...h.path.map(lane),lane([x,y])]);
+    });
+  });
+
+  // 3. pins: a defender that sits between a slider and the king and could otherwise have blocked or captured the checker
+  if(checkers.length===1){
+    const ck=checkers[0],kh=ck.hits.find(h=>at(h,K[0],K[1]));
+    const resolve=new Set([ck.w.f+','+ck.w.r,...kh.path.map(([x,y])=>x+','+y)]);
+    RING.forEach(([dx,dy])=>{
+      let x=K[0]+dx,y=K[1]+dy,pin=null;const seq=[];
+      while(inb(x,y)){
+        const q=b[y][x];
+        if(!q)seq.push([x,y]);
+        else if(!pin){if(q.color!==loser)break;pin=[x,y];seq.push([x,y])}
+        else{
+          const diag=dx!==0&&dy!==0;
+          if(q.color===win&&(q.type==='q'||q.type===(diag?'b':'r'))&&canGo(b,pin[0],pin[1],resolve))
+            groups.push([{f:x,r:y,kind:'src'},...seq.slice().reverse().map(lane)]);
+          break;
+        }
+        x+=dx;y+=dy;
+      }
+    });
+  }
+  return{king:K,groups};
+}
+
+/* ---- the effects ---- */
+function shake(stage){stage.classList.remove('shake');void stage.offsetWidth;stage.classList.add('shake')}
 function sparks(L,name,colors,n,dist){
-  const[c,r]=colRow(name);
+  const[f,r]=pos(name),[c,rr]=scr(f,r);
   for(let i=0;i<n;i++){
     const a=Math.PI*2*i/n+Math.random()*.6,d=dist*(.65+Math.random()*.7);
-    gone(el('div','fx-spark',L,`left:${(c+.5)*12.5}%;top:${(r+.5)*12.5}%;--dx:${(Math.cos(a)*d).toFixed(0)}%;--dy:${(Math.sin(a)*d).toFixed(0)}%;background:${colors[i%colors.length]};animation-delay:${(Math.random()*.1).toFixed(2)}s`));
+    gone(el('fx-spark',L,`left:${(c+.5)*12.5}%;top:${(rr+.5)*12.5}%;--dx:${(Math.cos(a)*d).toFixed(0)}%;--dy:${(Math.sin(a)*d).toFixed(0)}%;background:${colors[i%colors.length]};animation-delay:${(Math.random()*.1).toFixed(2)}s`));
   }
 }
-function shake(stage,small){
-  stage.classList.remove('shake','shake-s');void stage.offsetWidth;stage.classList.add(small?'shake-s':'shake');
+function brilliant(low,top,stage,to){
+  gone(el('fx-flash',low));
+  [0,.14].forEach(d=>gone(cell(top,to,'fx-ring blue',d)));
+  shake(stage);
 }
-function svgLayer(L){return sv('svg',{class:'fx-svg',viewBox:'0 0 800 800',preserveAspectRatio:'none'},L)}
-function badge(g,name,fill,kind,a,delay){
-  const[c,r]=colRow(name),x=c*100+80,y=r*100+20;
-  const b=sv('g',{class:'fx-badge'+(a?' a':'')},g);if(a)b.style.animationDelay=delay+'s';
-  sv('circle',{cx:x,cy:y,r:18,fill,stroke:'#fff','stroke-width':3},b);
-  const ln=(x1,y1,x2,y2)=>sv('line',{x1,y1,x2,y2,stroke:'#fff','stroke-width':4,'stroke-linecap':'round'},b);
-  if(kind==='x'){ln(x-7,y-7,x+7,y+7);ln(x+7,y-7,x-7,y+7)}                 // checkmate
-  else{ln(x-8,y-4.5,x+8,y-4.5);ln(x-8,y+4.5,x+8,y+4.5)}                   // stalemate: "="
+function promotion(top,to){
+  gone(cell(top,to,'fx-ring gold',0));
+  sparks(top,to,['#fff2a8','#ffd23a','#ff9f1c'],14,900);
 }
-
-const FX={
-  brilliant(L,o,a){
-    glow(L,o.mv.to,'brilliant');
-    if(!a)return;
-    const[c,r]=colRow(o.mv.to);
-    gone(el('div','fx-wash',L));
-    gone(el('div','fx-flash',L,`background:radial-gradient(circle at ${(c+.5)*12.5}% ${(r+.5)*12.5}%,rgba(255,255,255,.98) 0,rgba(120,205,255,.85) 14%,rgba(35,120,255,.55) 40%,rgba(35,120,255,0) 75%)`));
-    ripple(L,o.mv.to,'blue',[0,.13,.26]);
-    sparks(L,o.mv.to,['#ffffff','#8fdcff','#2e8bff'],16,1100);
-    shake(o.stage,false);
-  },
-  great(L,o,a){
-    glow(L,o.mv.to,'great');
-    if(!a)return;
-    ripple(L,o.mv.to,'blue',[0,.18]);
-    sparks(L,o.mv.to,['#cfe6ff','#749BBF'],8,700);
-  },
-  blunder(L,o,a){
-    glow(L,o.mv.to,'blunder');
-    if(!a)return;
-    gone(el('div','fx-vig',L));
-    ripple(L,o.mv.to,'red',[0]);
-    shake(o.stage,true);
-  },
-  mistake(L,o,a){
-    glow(L,o.mv.to,o.c.k);                      // "mistake" (orange) or "miss" (red)
-    if(!a)return;
-    ripple(L,o.mv.to,o.c.k==='miss'?'red':'orange',[0]);
-  },
-  check(L,o,a){
-    const k=kingOf(o.ch,o.ch.turn());if(!k)return;
-    sq(L,k,'fx-check');
-    if(a)ripple(L,k,'red',[0,.2]);
-  },
-  promo(L,o,a){
-    if(!a)return;
-    ripple(L,o.mv.to,'gold',[0,.15]);
-    sparks(L,o.mv.to,['#fff2a8','#ffd23a','#ff9f1c'],14,900);
-  },
-  mate(L,o,a){
-    const loser=o.ch.turn(),k=kingOf(o.ch,loser);if(!k)return;
-    const atk=attackers(o.ch,k,loser==='w'?'b':'w');
-    sq(L,k,'fx-mate-king'+(a?' a':''));                               // king glow sits under the line
-    const g=svgLayer(L),kc=ctr(k);
-    atk.forEach((t,n)=>{
-      const A=ctr(t.sq);let pts=[A];
-      if(t.type==='n'){                                              // knights: long leg first, then the short one
-        const dx=kc[0]-A[0],dy=kc[1]-A[1];
-        pts.push(Math.abs(dx)>Math.abs(dy)?[kc[0],A[1]]:[A[0],kc[1]]);
-      }
-      pts.push(kc);
-      t.path.forEach((p,i)=>{                                        // squares the attack passes over
-        const[c,r]=colRow(p);
-        const rc=sv('rect',{x:c*100,y:r*100,width:100,height:100,class:'fx-path'+(a?' a':'')},g);
-        if(a)rc.style.animationDelay=(.1+i*.08)+'s';
-      });
-      const last=pts[pts.length-1],prev=pts[pts.length-2];           // stop short of the king and finish with an arrow head
-      let ux=last[0]-prev[0],uy=last[1]-prev[1];const len=Math.hypot(ux,uy)||1;ux/=len;uy/=len;
-      const tip=[last[0]-ux*26,last[1]-uy*26],bc=[tip[0]-ux*38,tip[1]-uy*38],px=-uy,py=ux;
-      pts=pts.slice(0,-1).concat([[bc[0]+ux*2,bc[1]+uy*2]]);
-      sv('circle',{cx:A[0],cy:A[1],r:46,class:'fx-ring'+(a?' a':'')},g);
-      const pl=sv('polyline',{points:pts.map(p=>p.join(',')).join(' '),class:'fx-line'+(a?' a':''),pathLength:1},g);
-      if(a)pl.style.animationDelay=(.2+n*.1)+'s';
-      const ar=sv('polygon',{points:[tip,[bc[0]+px*26,bc[1]+py*26],[bc[0]-px*26,bc[1]-py*26]].map(p=>p.join(',')).join(' '),class:'fx-arrow'+(a?' a':'')},g);
-      if(a)ar.style.animationDelay=(.62+n*.1)+'s';
+function mate(low,ch,a,mv){
+  const m=mateLanes(ch);if(!m)return;
+  const sq=new Map();let t0=0;
+  m.groups.forEach(g=>{                                               // each line is drawn outward from its piece, one after another
+    g.forEach((s,i)=>{
+      const n=nameOf(s.f,s.r),e=sq.get(n);
+      if(!e)sq.set(n,{kind:s.kind,t:t0+i*.07});else if(s.kind==='src')e.kind='src';
     });
-    badge(g,k,'#e53935','x',a,.85);
-    if(a){ripple(L,k,'red',[.6,.85]);}
-  },
-  stalemate(L,o,a){
-    const k=kingOf(o.ch,o.ch.turn());if(!k)return;
-    const[c0,r0]=colRow(k);
-    const ring=[[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];     // clockwise from the top
-    let n=0;
-    ring.forEach(([dx,dy])=>{
-      const c=c0+dx,r=r0+dy;if(c<0||c>7||r<0||r>7)return;
-      const e=cell(L,c,r,'fx-grey'+(a?' a':''));
-      if(a)e.style.animationDelay=(.1+n*.1)+'s';
-      n++;
-    });
-    const kg=cell(L,c0,r0,'fx-grey-king'+(a?' a':''));
-    if(a)kg.style.animationDelay=(.1+n*.1+.1)+'s';
-    const g=svgLayer(L);
-    badge(g,k,'#8b8f98','eq',a,.1+n*.1+.35);
-  },
-};
-
-/* Called at the end of every board render. Draws the effects for the move on screen (nothing for engine-line previews). */
-export function syncFx(){
-  const layer=$('fx'),stage=$('bstage');if(!layer||!stage)return;
-  if(!stage._fx){stage._fx=1;stage.addEventListener('animationend',e=>{if(e.target===stage)stage.classList.remove('shake','shake-s')})}
-  const pv=S.preview,idx=S.idx,c=(!pv&&idx>0)?S.cls[idx]:null;
-  const key=(pv||idx<1)?'':`${S.line.id}:${idx}:${c?c.k:''}`;
-  const sig=key+'|'+(S.flip?1:0);
-  if(sig===cur)return;                                           // nothing changed: leave running animations alone
-  const flipOnly=cur.split('|')[0]===key;
-  cur=sig;
-  layer.replaceChildren();stage.classList.remove('shake','shake-s');
-  if(!key)return;
-  const mv=S.moves[idx-1],fen=S.fens[idx];if(!mv||!fen)return;
-  const ch=new Chess(fen),san=mv.san||'',ids=[];
-  if(san.endsWith('#'))ids.push('mate');
-  else if(ch.in_stalemate())ids.push('stalemate');
-  else if(san.endsWith('+'))ids.push('check');
-  if(san.includes('='))ids.push('promo');
-  if(c){const k=c.k;if(k==='brilliant'||k==='great'||k==='blunder')ids.push(k);else if(k==='mistake'||k==='miss')ids.push('mistake')}
-  const base=`${S.line.id}:${idx}:`,quiet=reduced();
-  ids.forEach(id=>{
-    const a=!flipOnly&&!quiet&&!seen.has(base+id);
-    seen.add(base+id);
-    try{FX[id](layer,{ch,mv,c,san,stage},a)}catch(e){}
+    t0+=.12;
   });
+  const kn=nameOf(m.king[0],m.king[1]);sq.delete(kn);
+  sq.delete(mv.from);sq.delete(mv.to);                              // the move just played keeps its normal highlight and badge, untouched
+  let last=0;sq.forEach(v=>{last=Math.max(last,v.t)});
+  const k=last>1.2?1.2/last:1;                                        // never take longer than about 1.5 s in total
+  sq.forEach((v,n)=>cell(low,n,'fx-red '+v.kind+(a?' a':''),a?v.t*k:null));
+  const kt=last*k+.12;
+  cell(low,kn,'fx-red king'+(a?' a':''),a?kt:null);
+  st={kind:'mate',turn:true,king:kn,anim:a,kd:kt+.2,bd:kt+.65};
+}
+function stalemate(low,ch,a){
+  const side=ch.turn(),b=ch.board();let K=null;
+  for(let r=0;r<8;r++)for(let f=0;f<8;f++){const p=b[r][f];if(p&&p.type==='k'&&p.color===side)K=[f,r]}
+  if(!K)return;
+  const[c0,r0]=scr(K[0],K[1]);let n=0;
+  RING.forEach(([dx,dy])=>{
+    const c=c0+dx,r=r0+dy;if(c<0||c>7||r<0||r>7)return;
+    cellScr(low,c,r,'fx-grey'+(a?' a':''),a?.1+n*.1:null);n++;
+  });
+  const kt=.1+n*.1+.1;
+  cellScr(low,c0,r0,'fx-grey king'+(a?' a':''),a?kt:null);
+  st={kind:'stale',turn:false,king:nameOf(K[0],K[1]),anim:a,kd:0,bd:kt+.35};
+}
+
+/* The king's own square belongs to the board, which render() rebuilds every time, so the turned king and its badge are
+   put back on every call (without their entrance animation after the first). */
+function decorate(){
+  if(!st)return;
+  const bd=$('board');if(!bd||!bd.children)return;
+  const[f,r]=pos(st.king),[c,rr]=scr(f,r),sq=bd.children[rr*8+c];if(!sq)return;
+  if(st.turn){
+    const pc=sq.querySelector('img.pc,.pc-fb');
+    if(pc){pc.classList.add(st.anim?'fx-king-turn':'fx-king-down');if(st.anim)pc.style.animationDelay=st.kd.toFixed(2)+'s'}
+  }
+  if(!sq.querySelector('.fx-badge')){
+    const b=el('fx-badge '+st.kind+(st.anim?' a':''),sq);
+    b.textContent=st.kind==='mate'?'#':'=';
+    if(st.anim)b.style.animationDelay=st.bd.toFixed(2)+'s';
+  }
+  st.anim=false;
+}
+
+function build(low,top,stage,flipOnly,brill){
+  low.replaceChildren();if(top)top.replaceChildren();stage.classList.remove('shake');st=null;
+  const mv=S.moves[S.idx-1],fen=S.fens[S.idx];if(!mv||!fen)return;
+  let ch;try{ch=new Chess(fen)}catch(e){return}
+  const san=mv.san||'',quiet=reduced();
+  const first=id=>{                                                  // true only the first time this effect is shown in this analysis
+    const k=`${S.line.id}:${S.idx}:${id}`,a=!flipOnly&&!quiet&&!seen.has(k);
+    seen.add(k);return a;
+  };
+  try{
+    if(san.endsWith('#'))mate(low,ch,first('mate'),mv);
+    else if(ch.in_stalemate())stalemate(low,ch,first('stale'));
+    else{
+      if(brill&&first('brilliant'))brilliant(low,top,stage,mv.to);
+      if(san.includes('=')&&first('promo'))promotion(top,mv.to);
+    }
+  }catch(e){}
+}
+
+/* Called at the end of every board render. Nothing is drawn for engine-line previews or the start position. */
+export function syncFx(){
+  const low=$('fx'),top=$('fxtop'),stage=$('bstage');if(!low||!stage)return;
+  if(!stage._fx){stage._fx=1;stage.addEventListener('animationend',e=>{if(e.target===stage)stage.classList.remove('shake')})}
+  const pv=S.preview,idx=S.idx,c=(!pv&&idx>0)?S.cls[idx]:null;
+  const brill=!!(c&&c.k==='brilliant');
+  const key=(pv||idx<1)?'':`${S.line.id}:${idx}:${brill?1:0}`;
+  const sig=key+'|'+(S.flip?1:0);
+  if(sig!==cur){                                                     // unchanged -> leave running animations alone
+    const flipOnly=!!key&&cur.split('|')[0]===key;
+    cur=sig;
+    if(key)build(low,top,stage,flipOnly,brill);
+    else{low.replaceChildren();if(top)top.replaceChildren();stage.classList.remove('shake');st=null}
+  }
+  decorate();
 }

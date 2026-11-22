@@ -2,8 +2,9 @@ import {$} from './util.js';
 import {setBtn} from './ui/svg.js';
 
 /* ---------- Sound effects ----------
-   Moves, captures and alerts use the Chess.com sound files (move-self, capture, notify), loaded straight from their CDN.
-   If a file can't be loaded (offline, blocked) the same sound is synthesised with the Web Audio API instead.
+   Moves use the Chess.com sound files, loaded straight from their CDN: move-self, capture, castle, promote, move-check and
+   game-end (checkmate / stalemate / draw), plus notify for "analysis complete". One sound per move, picked in moveSfx().
+   If a file can't be loaded (offline, blocked, format not supported) the same sound is synthesised with the Web Audio API instead.
    Small UI sounds (clicks, toggles, piece selection, errors) are always synthesised.
    Browsers keep audio locked until the person has interacted with the page, so nothing plays before the first click / key press.
    Settings (on/off + volume) are remembered in localStorage and edited in Settings > Sound; M mutes from anywhere. */
@@ -12,26 +13,31 @@ const ST={on:true,vol:0.8};
 let ctx=null,master=null,noiseBuf=null,armed=false;
 const last={};
 
-const BASE='https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/';
-const FILE_OF={move:'move-self',capture:'capture',notify:'notify',check:'notify',mate:'notify',draw:'notify',done:'notify'};
-const SEQ={castle:[['move',0],['move',.12]],promote:[['move',0],['notify',.1]]};   // built from the same files
+const BASE='https://images.chesscomfiles.com/chess-themes/sounds/';
+const webm=(()=>{try{return !!new Audio().canPlayType('audio/webm; codecs="opus"')}catch(e){return false}})();
+const URLS={
+  move:'_MP3_/default/move-self.mp3',capture:'_MP3_/default/capture.mp3',castle:'_MP3_/default/castle.mp3',
+  promote:'_MP3_/default/promote.mp3',check:'_MP3_/default/move-check.mp3',notify:'_MP3_/default/notify.mp3',
+  end:webm?'_WEBM_/default/game-end.webm':'_MP3_/default/game-end.mp3',     // browsers without WebM try the MP3 twin
+};
+const FILE_OF={move:'move',capture:'capture',castle:'castle',promote:'promote',check:'check',notify:'notify',done:'notify',mate:'end',draw:'end'};
 const AUD={},bad=new Set();
-function audioFor(file){
-  if(AUD[file])return AUD[file];
+function audioFor(key){
+  if(AUD[key])return AUD[key];
   try{
-    const a=new Audio(BASE+file+'.mp3');a.preload='auto';
-    a.addEventListener('error',()=>bad.add(file));
-    AUD[file]=a;return a;
-  }catch(e){bad.add(file);return null}
+    const a=new Audio(BASE+URLS[key]);a.preload='auto';
+    a.addEventListener('error',()=>bad.add(key));
+    AUD[key]=a;return a;
+  }catch(e){bad.add(key);return null}
 }
 // true if the file was started (or is on its way); false means "use the synthesised fallback"
-function playFile(file,onFail){
-  if(bad.has(file))return false;
-  const base=audioFor(file);if(!base)return false;
+function playFile(key,onFail){
+  if(bad.has(key))return false;
+  const base=audioFor(key);if(!base)return false;
   try{
     const a=base.cloneNode();a.volume=Math.min(1,gainOf(ST.vol));
     const p=a.play();
-    if(p&&p.catch)p.catch(err=>{if(err&&err.name==='NotSupportedError'){bad.add(file);onFail()}});
+    if(p&&p.catch)p.catch(err=>{if(err&&err.name==='NotSupportedError'){bad.add(key);onFail()}});
     return true;
   }catch(e){return false}
 }
@@ -96,6 +102,11 @@ const thud=(t,p=1,v=1)=>{
 const SOUNDS={
   move:t=>tap(t),
   capture:t=>{thud(t);tap(t+.045,1.15,.55)},
+  castle:t=>{tap(t,1,.9);tap(t+.11,.85,.9)},
+  promote:t=>{
+    tap(t,1.05,.8);
+    [523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(t+.09+i*.065,{f,type:'triangle',vol:.22,dur:.24}));
+  },
   check:t=>{
     tone(t,{f:740,type:'triangle',vol:.26,dur:.09});
     tone(t+.085,{f:988,type:'triangle',vol:.26,dur:.15});
@@ -164,21 +175,20 @@ function fire(name){
 }
 export function sfx(name,delay=0){
   if(!ST.on||!armed)return;
-  if(SEQ[name]){SEQ[name].forEach(([n,d])=>sfx(n,delay+d));return}
   if(delay>0){setTimeout(()=>{if(ST.on)fire(name)},delay*1000);return}
   fire(name);
 }
 
-/* The sound for one move, worked out from its SAN ("Nxe5+", "O-O", "e8=Q#") and the position after it. */
+/* The sound for one move, worked out from its SAN ("Nxe5+", "O-O", "e8=Q#") and the position after it.
+   One sound per move, most important first: checkmate / stalemate / draw > check > promotion > castling > capture > move. */
 export function moveSfx(san,fenAfter){
-  const s=san||'';
-  sfx(/^O-O/.test(s)?'castle':s.includes('=')?'promote':s.includes('x')?'capture':'move');
-  let end=null;
-  if(s.endsWith('#'))end='mate';
+  const s=san||'';let n=null;
+  if(s.endsWith('#'))n='mate';
   else if(fenAfter){
-    try{const c=new Chess(fenAfter);if(c.game_over()&&!c.in_checkmate())end='draw'}catch(e){}
+    try{const c=new Chess(fenAfter);if(c.game_over()&&!c.in_checkmate())n='draw'}catch(e){}
   }
-  if(end)sfx(end,.08);else if(s.endsWith('+'))sfx('check',.07);
+  if(!n)n=s.endsWith('+')?'check':s.includes('=')?'promote':/^O-O/.test(s)?'castle':s.includes('x')?'capture':'move';
+  sfx(n);
 }
 
 /* ---------- Setup: unlock, UI sounds, settings controls ---------- */
@@ -199,7 +209,7 @@ function paint(){
 }
 export function initSound(){
   load();
-  new Set(Object.values(FILE_OF)).forEach(audioFor);          // start fetching the files right away
+  Object.keys(URLS).forEach(audioFor);          // start fetching the files right away
   const unlock=()=>{
     armed=true;
     const c=ac();if(c&&c.state==='suspended')c.resume().catch(()=>{});

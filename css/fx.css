@@ -1,67 +1,50 @@
 /* ---------- Board effects (js/ui/fx.js) ----------
-   The layer sits over the board. Every animation here only defines its starting frame (or is a transient element that removes
-   itself), so with animations off - or when you come back to a move - the element simply shows its still end state. */
+   Flat colours only. Layer order, bottom to top: square colours / move highlight  <  .fx (red & grey squares, flash)
+   <  pieces (z 2)  <  .fx-top (ripples, sparkles; z 5)  <  classification badge and #/= badge (z 6).
+   Animations only describe the entrance (the element's normal style IS the finished state), so revisiting a move
+   - or reduced-motion - simply shows the end result. */
 .bstage{position:relative;align-self:flex-start;margin-top:6px}
 .bstage .board{margin-top:0}
-.fx{position:absolute;inset:var(--bw,0px);pointer-events:none;overflow:hidden;z-index:9;border-radius:4px}
-.fx-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.fx{position:absolute;inset:var(--bw,0px);pointer-events:none;overflow:hidden;z-index:1;border-radius:4px}
+.fx-top{z-index:5}
 .fx-sq{position:absolute;width:12.5%;height:12.5%;box-sizing:border-box}
 
-/* shake (individual `translate` property so it never fights the board's own transforms) */
 @keyframes fxShake{
   0%,100%{translate:0 0}
-  10%{translate:calc(-9px*var(--k,1)) calc(4px*var(--k,1))}   20%{translate:calc(8px*var(--k,1)) calc(-5px*var(--k,1))}
-  30%{translate:calc(-7px*var(--k,1)) calc(-3px*var(--k,1))}  40%{translate:calc(6px*var(--k,1)) calc(5px*var(--k,1))}
-  50%{translate:calc(-5px*var(--k,1)) calc(2px*var(--k,1))}   60%{translate:calc(4px*var(--k,1)) calc(-3px*var(--k,1))}
-  70%{translate:calc(-3px*var(--k,1)) calc(2px*var(--k,1))}   85%{translate:calc(2px*var(--k,1)) calc(-1px*var(--k,1))}
+  10%{translate:-9px 4px}20%{translate:8px -5px}30%{translate:-7px -3px}40%{translate:6px 5px}
+  50%{translate:-5px 2px}60%{translate:4px -3px}70%{translate:-3px 2px}85%{translate:2px -1px}
 }
-.bstage.shake{animation:fxShake .6s cubic-bezier(.36,.07,.19,.97) both}
-.bstage.shake-s{--k:.45;animation:fxShake .42s cubic-bezier(.36,.07,.19,.97) both}
-
-/* transient pieces */
-@keyframes fxFlash{0%{opacity:0}10%{opacity:1}100%{opacity:0}}
-@keyframes fxWash{0%{opacity:0}8%{opacity:.85}22%{opacity:.15}36%{opacity:.6}100%{opacity:0}}
-@keyframes fxVig{0%{opacity:0}14%{opacity:1}100%{opacity:0}}
-@keyframes fxRipple{from{opacity:.95;scale:.25}to{opacity:0;scale:4.4}}
+@keyframes fxFlash{0%{opacity:0}12%{opacity:.6}30%{opacity:.1}48%{opacity:.5}100%{opacity:0}}
+@keyframes fxRipple{from{opacity:.95;scale:.25}to{opacity:0;scale:4.2}}
 @keyframes fxSpark{from{opacity:1;translate:0 0;scale:1}to{opacity:0;translate:var(--dx) var(--dy);scale:.15}}
-.fx-flash{position:absolute;inset:0;animation:fxFlash .95s ease-out both}
-.fx-wash{position:absolute;inset:0;background:rgba(70,150,255,.55);mix-blend-mode:screen;animation:fxWash .6s ease-out both}
-.fx-vig{position:absolute;inset:0;box-shadow:inset 0 0 90px 22px rgba(251,72,52,.9);animation:fxVig .85s ease-out both}
-.fx-ripple{border-radius:50%;border:5px solid;animation:fxRipple .75s ease-out both}
-.fx-ripple.blue{border-color:#5cc8ff;box-shadow:0 0 14px 2px rgba(60,170,255,.8)}
-.fx-ripple.red{border-color:#ff4b3a;box-shadow:0 0 14px 2px rgba(255,70,50,.7)}
-.fx-ripple.orange{border-color:#ffae64;box-shadow:0 0 12px 2px rgba(255,174,100,.7)}
-.fx-ripple.gold{border-color:#ffd23a;box-shadow:0 0 14px 2px rgba(255,200,60,.8)}
+@keyframes fxFade{from{opacity:0}}
+@keyframes fxPop{from{opacity:0;scale:.2}}
+@keyframes fxTurn{from{rotate:0deg}to{rotate:180deg}}
+
+/* brilliant / promotion (transient) */
+.bstage.shake{animation:fxShake .6s cubic-bezier(.36,.07,.19,.97) both}
+.fx-flash{position:absolute;inset:0;background:#2f8bff;animation:fxFlash .9s ease-out both}
+.fx-ring{border-radius:50%;border:4px solid;animation:fxRipple .75s ease-out both}
+.fx-ring.blue{border-color:#4db3ff}
+.fx-ring.gold{border-color:#ffd23a}
 .fx-spark{position:absolute;width:1.8%;height:1.8%;margin:-.9% 0 0 -.9%;transform:rotate(45deg);animation:fxSpark .8s cubic-bezier(.1,.7,.3,1) both}
 
-/* end states (still visible whenever the move is on screen) */
-.fx-glow{border-radius:2px}
-.fx-glow.brilliant{box-shadow:inset 0 0 0 3px rgba(80,175,255,.95),inset 0 0 26px 4px rgba(50,140,255,.75)}
-.fx-glow.great{box-shadow:inset 0 0 0 3px rgba(130,170,205,.95),inset 0 0 20px 3px rgba(116,155,191,.7)}
-.fx-glow.blunder{box-shadow:inset 0 0 0 3px rgba(251,72,52,.95),inset 0 0 24px 4px rgba(251,72,52,.7)}
-.fx-glow.mistake{box-shadow:inset 0 0 0 3px rgba(255,174,100,.95),inset 0 0 22px 3px rgba(255,174,100,.65)}
-.fx-glow.miss{box-shadow:inset 0 0 0 3px rgba(255,119,105,.95),inset 0 0 22px 3px rgba(255,119,105,.65)}
-.fx-check{background:radial-gradient(circle,rgba(255,40,40,.95) 0,rgba(255,40,40,.55) 42%,rgba(255,40,40,0) 78%)}
+/* checkmate: red attack lanes (src = the attacking piece, king = the mated king) */
+.fx-red{background:rgba(255,59,48,.58)}
+.fx-red.src{background:rgba(235,35,30,.8)}
+.fx-red.king{background:rgba(225,25,25,.92)}
+.fx-red.a{animation:fxFade .25s ease both}
+.sq .fx-king-down{rotate:180deg}                       /* the mated king is turned over (change to 90deg to lay it on its side) */
+.sq .fx-king-turn{animation:fxTurn .5s cubic-bezier(.3,1.4,.5,1) both}
 
-/* checkmate */
-@keyframes fxFade{from{opacity:0}}
-@keyframes fxDraw{from{stroke-dashoffset:1}}
-@keyframes fxPopIn{from{opacity:0;scale:.2}}
-.fx-mate-king{background:radial-gradient(circle,rgba(255,59,48,.95) 0,rgba(255,59,48,.6) 50%,rgba(255,59,48,.25) 85%)}
-.fx-mate-king.a{animation:fxFade .35s ease .55s both}
-.fx-path{fill:rgba(255,59,48,.26)}
-.fx-path.a{animation:fxFade .25s ease both}
-.fx-ring{fill:rgba(255,59,48,.16);stroke:#ff3b30;stroke-width:6;transform-box:fill-box;transform-origin:center}
-.fx-ring.a{animation:fxPopIn .3s ease-out .1s both}
-.fx-line{fill:none;stroke:#ff3b30;stroke-width:16;stroke-linecap:round;stroke-linejoin:round;opacity:.92;stroke-dasharray:1;stroke-dashoffset:0}
-.fx-line.a{animation:fxDraw .45s cubic-bezier(.4,0,.2,1) both}
-.fx-arrow{fill:#ff3b30;opacity:.95;transform-box:fill-box;transform-origin:center}
-.fx-arrow.a{animation:fxPopIn .22s ease-out both}
-.fx-badge{transform-box:fill-box;transform-origin:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
-.fx-badge.a{animation:fxPopIn .35s cubic-bezier(.3,1.5,.5,1) both}
+/* stalemate: grey squares around the king */
+.fx-grey{background:rgba(140,146,158,.78)}
+.fx-grey.king{background:rgba(105,111,123,.92)}
+.fx-grey.a{animation:fxPop .3s cubic-bezier(.3,1.4,.5,1) both}
 
-/* stalemate: grey squares close in around the king */
-.fx-grey{background:rgba(140,146,158,.62);box-shadow:inset 0 0 0 2px rgba(255,255,255,.38)}
-.fx-grey.a{animation:fxPopIn .35s cubic-bezier(.3,1.4,.5,1) both}
-.fx-grey-king{box-shadow:inset 0 0 0 4px rgba(228,231,238,.95),0 0 18px 4px rgba(180,186,198,.8)}
-.fx-grey-king.a{animation:fxPopIn .4s cubic-bezier(.3,1.4,.5,1) both}
+/* "#" / "=" badge on the king's square, same spot as the classification badge */
+.sq .fx-badge{position:absolute;z-index:6;width:38%;height:38%;right:-12%;top:-12%;border-radius:50%;display:grid;place-items:center;
+  border:2px solid #fff;color:#fff;font:700 calc(var(--size)/30)/1 "Schibsted Grotesk",sans-serif;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));pointer-events:none}
+.sq .fx-badge.mate{background:#e53935}
+.sq .fx-badge.stale{background:#8b8f98}
+.sq .fx-badge.a{animation:fxPop .35s cubic-bezier(.3,1.5,.5,1) both}
