@@ -1,5 +1,5 @@
 export const $=id=>document.getElementById(id);
-export const setStatus=t=>{for(const id of ['status','impStatus']){const e=$(id);if(e)e.textContent=t}};
+export const setStatus=t=>{for(const id of ['status','impStatus','ldStatus']){const e=$(id);if(e)e.textContent=t}};
 export const uciOf=m=>m.from+m.to+(m.promotion||'');
 export function fmt(l){
   if(!l)return'';

@@ -9,6 +9,7 @@ import {loadOpenings} from './openings.js';
 import {loadPgn} from './pgn.js';
 import {analyze,resumeAll,syncPause,cancelAnalysis} from './analysis.js';
 import {showScreen,screen} from './screens.js';
+import {hideLoader} from './ui/loader.js';
 import {resetAux} from './live.js';
 import {go} from './nav.js';
 import {render} from './ui/board.js';
@@ -36,6 +37,9 @@ $('bPause').onclick=()=>{
   S.paused=!S.paused;syncPause();
   if(S.paused){POOL.forEach(e=>e.halt());setStatus('Paused.')}else resumeAll();
 };
+$('ldPause').onclick=()=>$('bPause').onclick();
+$('ldHide').onclick=()=>hideLoader();
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('loader').hidden&&$('settings').hidden)hideLoader()});
 $('chkDeepen').onchange=e=>{CFG.deepen=e.target.checked;if(!CFG.deepen&&S.deep){S.deep=false;S.paused=false;resumeAll();syncPause();setStatus('Stopped deepening.')}};
 $('selEngine').onchange=()=>{        // switch engines: throw the old workers away and start over
   cancelAnalysis();

@@ -167,9 +167,9 @@ export function forkOf(ch,mv,prev){
 
 /* Every pin `color` has on the board: a bishop / rook / queen, one enemy piece in front of it on the line, and behind that
    - the king, or
-   - a piece that is worth clearly more (the pinned piece is lower, and the one behind is a rook or queen), or
-   - a piece of equal value that nothing protects (otherwise moving the front piece just offers a trade).
-   Pinning something to a piece that is worth less or the same and defended is not a pin worth showing. */
+   - a piece worth more than the pinner itself (a rook or queen behind the pinned piece), or
+   - a piece nothing protects (worth at least a minor piece, and at least as much as the one in front).
+   Queen -> pawn -> defended queen is NOT a pin worth showing: if the pawn moves it is only a queen trade. */
 function pinsIn(b,color){
   const out=[],foe=color==='w'?'b':'w';
   for(let y0=0;y0<8;y0++)for(let x0=0;x0<8;x0++){
@@ -182,8 +182,8 @@ function pinsIn(b,color){
         else if(!front){if(q.color!==foe||q.type==='k')return;front=[x,y,q];seq.push(T_(x,y))}
         else{
           if(q.color===foe){
-            const vf=V[front[2].type],vb=V[q.type];
-            const ok=q.type==='k'||(vb>vf&&vb>=5)||(vb===vf&&vb>=3&&!attackers(b,foe,x,y,[front[0],front[1]]).length);
+            const vf=V[front[2].type],vb=V[q.type],vp=V[p.type];
+            const ok=q.type==='k'||(vb>vp&&vb>=5)||(vb>=3&&vb>=vf&&!attackers(b,foe,x,y,[front[0],front[1]]).length);
             if(ok)out.push({key:`${front[0]},${front[1]}>${x},${y}`,group:[S_(x0,y0),...seq,T_(x,y)]});
           }
           return;

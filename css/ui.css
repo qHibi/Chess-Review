@@ -83,3 +83,13 @@ button svg.i{width:1.15em;height:1.15em}
 .vol:disabled{opacity:.4;cursor:default}
 /* promotion piece shown as an icon inside a move ("e8=♕") */
 .pcm{width:1.35em;height:1.35em;vertical-align:-.35em;margin:0 -.05em;pointer-events:none}
+/* Chess.com logo already has the name in it: show it big, without a text label */
+.tab[data-src=chesscom]{padding:3px 8px}
+.tab[data-src=chesscom] img.i{height:28px;width:auto;max-width:100%;object-fit:contain}
+.tab[data-src=chesscom] svg.i{width:26px;height:26px}
+@media(max-width:560px){
+  .side>.top .brand b{display:none}
+  .top-btns{flex:none}
+  #bNew{padding:8px 10px;font-size:13px;white-space:nowrap}
+  #bNew span{white-space:nowrap}
+}

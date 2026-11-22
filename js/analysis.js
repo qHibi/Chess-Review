@@ -4,6 +4,7 @@ import {CFG} from './config.js';
 import {setBtn} from './ui/svg.js';
 import {POOL,getPool,workerCount,terminal} from './engine.js';
 import {showScreen} from './screens.js';
+import {openLoader,updateLoader,finishLoader,hideLoader} from './ui/loader.js';
 import {classifyAll,classify,withOver} from './classification/classify.js';
 import {derive} from './derive.js';
 import {fetchBook,bookLength} from './openings.js';
@@ -44,9 +45,13 @@ async function searchGate(w,fen,depth,run){
 export function cancelAnalysis(){
   S.run++;S.batch=false;S.deep=false;S.paused=false;resumeAll();
   POOL.forEach(e=>e.halt());
-  $('prog').style.width='0';syncPause();
+  $('prog').style.width='0';syncPause();hideLoader(true);
 }
-export function syncPause(){const on=S.batch||S.deep;$('bPause').hidden=!on;setBtn($('bPause'),S.paused?'play':'pause',S.paused?'Resume':'Pause')}
+export function syncPause(){
+  const on=S.batch||S.deep;$('bPause').hidden=!on;
+  setBtn($('bPause'),S.paused?'play':'pause',S.paused?'Resume':'Pause');
+  const lp=$('ldPause');if(lp)setBtn(lp,S.paused?'play':'pause',S.paused?'Resume':'Pause');
+}
 const bookNote=()=>'Book: '+(S.bookSrc==='openings'?'openings.txt':'built-in list (openings.txt not found)');
 export async function analyze(){
   if(!POOL[0]||!POOL[0].ready){setStatus('Engine is still loading…');return}
@@ -54,7 +59,7 @@ export async function analyze(){
   showScreen('analysis');
   const run=++S.run;S.batch=true;syncPause();
   sfx('start');resetFx();                               // every board effect may play once again for this analysis
-  setStatus('Checking opening book…');
+  setStatus('Checking opening book…');openLoader();
   const M=MAIN;
   await fetchBook(M);
   if(S.run!==run)return;                                  // another game was loaded meanwhile
@@ -72,7 +77,7 @@ export async function analyze(){
       if(!lines){lines=await searchGate(w,M.fens[i],CFG.depth,run);if(lines===null)return}
       if(S.run!==run)return;
       M.P[i]=lines;done++;
-      $('prog').style.width=(done/total*100)+'%';
+      $('prog').style.width=(done/total*100)+'%';updateLoader(done/total*100);
       setStatus(`Analyzing… ${done}/${total}`+(nW>1?` · ${nW} workers`:''));
       const had=S.line===M?M.cls[S.idx]:null;
       if(withLine(M,advance))renderMoves();
@@ -86,7 +91,7 @@ export async function analyze(){
   S.batch=false;
   withLine(M,classifyAll);M.nextCls=M.fens.length;S.done=true;
   setStatus('Analysis complete at depth '+CFG.depth+'. '+bookNote()+'.');
-  sfx('done');
+  sfx('done');finishLoader();
   renderMoves();renderSummary();render();renderLines();flushLines();
   $('prog').style.width='0';syncPause();
   deepen(run);liveAnalyze();                          // (book positions have no stored search yet)

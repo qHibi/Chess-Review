@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="css/import.css">
 <link rel="stylesheet" href="css/ui.css">
 <link rel="stylesheet" href="css/motion.css">
+<link rel="stylesheet" href="css/loader.css">
 </head>
 <body data-screen="import">
 <div class="import-screen" id="importScreen">
@@ -33,7 +34,7 @@
       <div class="tabs" role="tablist" aria-label="Import a game">
         <button type="button" class="tab on" role="tab" data-src="pgn" aria-selected="true">PGN</button>
         <button type="button" class="tab" role="tab" data-src="lichess" data-icon="lichess" aria-selected="false">Lichess</button>
-        <button type="button" class="tab" role="tab" data-src="chesscom" data-icon="chesscom" aria-selected="false">Chess.com</button>
+        <button type="button" class="tab" role="tab" data-src="chesscom" data-icon="chesscom" data-size="30" aria-label="Chess.com" title="Chess.com" aria-selected="false"></button>
       </div>
       <div class="pane" data-pane="pgn">
         <textarea id="pgn" spellcheck="false" placeholder="Paste a PGN here (Chess.com and Lichess exports work as-is)"></textarea>
@@ -79,7 +80,7 @@
     <div class="top">
       <div class="brand"><span class="logo" data-icon="microscope" data-size="22"></span><b>Analysis Board</b></div>
       <div class="top-btns">
-        <button type="button" id="bNew" data-icon="plus">New game</button>
+        <button type="button" id="bNew" data-icon="plus">New analysis</button>
         <button type="button" id="bSound" title="Sound effects (M)" data-icon="volume" aria-pressed="true"></button>
         <button type="button" id="bSettings" data-icon="settings" title="Settings"></button>
       </div>
@@ -107,6 +108,28 @@
       <div id="scores"></div>
       <svg id="graph" viewBox="0 0 300 70" role="img" aria-label="Evaluation graph. Click to jump to a move."></svg>
       <table id="summary"></table>
+    </div>
+  </div>
+</div>
+
+<div class="loader" id="loader" hidden role="dialog" aria-modal="true" aria-labelledby="ldTitle">
+  <div class="ld-card">
+    <div class="ld-head">
+      <div><div class="ld-title" id="ldTitle">Analyzing game</div><div class="ld-sub" id="ldSub"></div></div>
+      <div class="ld-pct" id="ldPct">0%</div>
+    </div>
+    <div class="ld-bar"><i id="ldBar"></i></div>
+    <div class="ld-main">
+      <div class="ld-graphbox">
+        <div class="ld-cap">Evaluation <small>gaps are positions not analyzed yet</small></div>
+        <svg id="ldGraph" viewBox="0 0 300 170" role="img" aria-label="Evaluation graph of the positions analyzed so far"></svg>
+        <div class="ld-status" id="ldStatus"></div>
+      </div>
+      <div class="ld-tbl" id="ldTbl" aria-label="Move classifications so far"></div>
+    </div>
+    <div class="ld-actions">
+      <button type="button" class="mini" id="ldPause" data-icon="pause">Pause</button>
+      <button type="button" class="mini" id="ldHide" data-icon="chevron-down">Hide</button>
     </div>
   </div>
 </div>

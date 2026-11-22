@@ -34,13 +34,13 @@ export function blendAcc(d){
   return{acc:(wm+hm)/2,n:d.length};
 }
 // Rough, tunable mapping from accuracy to a rating. It is an estimate, not a real Elo.
-const RATE_PTS=[[30,100],[50,400],[65,800],[75,1200],[80,1500],[88,2000],[94,2500],[98,3000],[100,3200]];
+const RATE_PTS=[[30,100],[50,400],[65,800],[75,1200],[80,1500],[88,2000],[94,2500],[98,3000],[100,3650]];
 export function ratingFromAcc(a){
   if(a==null)return null;
   for(let k=1;k<RATE_PTS.length;k++){
     const[x0,y0]=RATE_PTS[k-1],[x1,y1]=RATE_PTS[k];
     if(a<=x1)return Math.round((y0+(y1-y0)*(Math.max(a,x0)-x0)/(x1-x0))/50)*50;
   }
-  return 3200;
+  return 3650;
 }
 export const accColor=a=>a>=90?'#26C2A3':a>=80?'#81B64C':a>=65?'#F7C631':a>=50?'#FFAE64':'#FB4834';

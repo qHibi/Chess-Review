@@ -253,7 +253,7 @@ export function initSound(){
   paint();
 
   // Which small sound each control makes (first match wins); null = silent because something else already plays
-  const UI=[['#bAnalyze',null],['#bNew','whoosh'],['#bResume','whoosh'],['#bFlip','flip'],['#bSettings,#bSettings2,#presetChip','open'],
+  const UI=[['#bAnalyze',null],['#bNew','whoosh'],['#ldHide','close'],['#bResume','whoosh'],['#bFlip','flip'],['#bSettings,#bSettings2,#presetChip','open'],
     ['#bCloseSet','close'],['.tab','tab'],['.preset','pick'],['.imp-g','pick'],['.cp','pick']];
   document.addEventListener('click',e=>{
     const t=e.target.closest&&e.target.closest('button');
