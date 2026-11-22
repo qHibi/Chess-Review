@@ -43,11 +43,14 @@ async function chesscomGames(user){
   return out;
 }
 
+let loadTok=0;
 async function loadAndAnalyze(pgn,user,white){
+  const t=++loadTok;                                    // only the most recent click may start an analysis
   $('pgn').value=pgn.trim();
   if(!loadPgn())return;
   S.flip=!!(user&&white&&white.toLowerCase()!==user.toLowerCase());render();
   if(POOL[0])await POOL[0].readyP;                      // a big engine may still be loading
+  if(t!==loadTok)return;
   analyze();
 }
 

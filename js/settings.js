@@ -2,17 +2,19 @@ import {$} from './util.js';
 import {CFG} from './config.js';
 import {setBtn} from './ui/svg.js';
 import {CP} from './ui/picker.js';
+import {FX,setFx} from './ui/fx.js';
+import {render} from './ui/board.js';
 
 /* ---------- Settings dialog: Analysis (presets) and Appearance tabs ----------
    A preset sets the individual controls (which live in the "Custom" section); touching any of those controls switches to Custom. */
 const PRESETS={
-  fast:  {label:'Fast',   depth:10, deepen:false, max:16, partial:true,  strict:1, info:'Depth 10. A quick first look, no extra passes.'},
-  normal:{label:'Normal', depth:14, deepen:true,  max:18, partial:true,  strict:1, info:'Depth 14, then the whole game is searched again deeper, up to depth 18.'},
-  deep:  {label:'Deep',   depth:18, deepen:true,  max:24, partial:false, strict:1, info:'Depth 18 on every position, then deeper passes up to depth 24. Slow, most accurate.'},
+  fast:  {label:'Fast',   depth:8,  deepen:false, max:16, partial:true,  strict:1, engine:'asm',  info:'Depth 8, no extra passes, classic JavaScript engine. Starts instantly and works everywhere.'},
+  normal:{label:'Normal', depth:14, deepen:true,  max:18, partial:true,  strict:1, engine:'auto', info:'Depth 14, then the whole game is searched again deeper, up to depth 18 (WebAssembly engine).'},
+  deep:  {label:'Deep',   depth:18, deepen:true,  max:24, partial:false, strict:1, engine:'auto', info:'Depth 18 on every position, then deeper passes up to depth 24 (WebAssembly engine). Slow, most accurate.'},
 };
-const KEY='chess.analysis';
+const KEY='chess.analysis2';           // v2: Fast became the default preset
 const IDS=['selDepth','selMax','chkDeepen','chkPartial','selStrict','selWorkers','selEngine'];
-let preset='normal',applying=false;
+let preset='fast',applying=false;
 
 const val=id=>{const e=$(id);return e.type==='checkbox'?e.checked:e.value};
 function put(id,v,fire){
@@ -40,7 +42,7 @@ function applyPreset(id,fire=true){
   if(P){
     applying=true;
     put('selDepth',P.depth,fire);put('selMax',P.max,fire);put('chkDeepen',P.deepen,fire);put('chkPartial',P.partial,fire);
-    put('selStrict',P.strict,fire);put('selWorkers',0,fire);
+    put('selStrict',P.strict,fire);put('selWorkers',0,fire);put('selEngine',P.engine,fire);
     applying=false;
   }
   readCFG();refresh();save();
@@ -62,17 +64,19 @@ export function initSettings(){
     preset=saved.preset;
     if(preset==='custom')IDS.forEach(i=>{if(i in saved.vals)put(i,saved.vals[i],false)});
     else{applyPreset(preset,false)}
-    if(saved.vals.selEngine)put('selEngine',saved.vals.selEngine,false);   // the engine type isn't part of a preset
-  }else applyPreset('normal',false);
+  }else applyPreset('fast',false);
   readCFG();refresh();
 
   document.querySelectorAll('#presets .preset').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));
   IDS.forEach(i=>$(i).addEventListener('change',()=>{
     if(applying)return;
-    if(i==='selEngine'){save();return}
     preset='custom';readCFG();refresh();save();
   }));
   $('bSettings').onclick=()=>open('analysis');
+  $('bSettings2').onclick=()=>open('analysis');
+  try{FX.on=localStorage.getItem('chess.fx')!=='0'}catch(e){}
+  $('chkFx').checked=FX.on;
+  $('chkFx').onchange=e=>{setFx(e.target.checked);render()};
   $('presetChip').onclick=()=>open('analysis');
   $('bCloseSet').onclick=close;
   document.querySelectorAll('#settings [data-tab]').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));

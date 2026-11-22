@@ -3,3 +3,13 @@
 .imp-g small{color:var(--mute);white-space:nowrap}
 .imp-g.win b{color:#81B64C}.imp-g.loss b{color:#FB4834}
 .hint{font-size:11px;color:var(--mute);margin-top:6px}
+/* ---------- Two screens ---------- */
+body[data-screen=import] .app{display:none}
+body[data-screen=analysis] .import-screen{display:none}
+.import-screen{display:grid;justify-content:center;padding:20px}
+.imp-wrap{width:min(560px,calc(100vw - 24px));display:flex;flex-direction:column;gap:12px}
+.imp-title{font-size:28px;margin:22px 0 0;letter-spacing:-.02em}
+.imp-sub{margin:0 0 4px;color:var(--mute);font-size:14px}
+.import-screen textarea{height:200px}
+.resume{width:100%;margin-top:10px}
+img.i.brand{border-radius:5px;object-fit:contain}

@@ -18,6 +18,7 @@ const P={
   'sliders':'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/>',
   'settings':'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   'palette':'<circle cx="13.5" cy="6.5" r="1" fill="currentColor"/><circle cx="17.5" cy="10.5" r="1" fill="currentColor"/><circle cx="8.5" cy="7.5" r="1" fill="currentColor"/><circle cx="6.5" cy="12.5" r="1" fill="currentColor"/><path d="M12 22a10 10 0 1 1 10-10c0 3-2 4-4.5 4H15a2 2 0 0 0-1.4 3.4c.5.6.4 1.4-.1 1.9-.4.5-1 .7-1.5.7z"/>',
+  'plus':'<path d="M12 5v14M5 12h14"/>',
   'x':'<path d="M18 6 6 18M6 6l12 12"/>',
   'check':'<path d="M20 6 9 17l-5-5"/>',
   'download':'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
@@ -39,6 +40,11 @@ const BRAND={
   lichess:'<path stroke="none" d="M7 21h12v-2.2H7zM8.2 18c.3-2.6 1.3-4.3 3-5.7-1.6-.2-4-.9-5-3.2-.8-1.9.2-3.7 1.4-4.4L7 3l2.1 1.5C10.3 3.5 12 3 13.6 3.2 17.6 3.8 20 7.3 19.6 11c-.3 2.6-1 4.6-1 7z"/><circle cx="12.4" cy="7.8" r=".9" fill="#222" stroke="none"/>',
   chesscom:'<g stroke="none"><circle cx="12" cy="6.6" r="3.3"/><path d="M9.4 10.6h5.2L16.4 17H7.6z"/><path d="M6 21.5v-2.8h12v2.8z"/></g>',
 };
+// Official logos (hot-linked); the drawn marks above are the fallback while loading or offline.
+const BRAND_IMG={
+  lichess:'https://raw.githubusercontent.com/lichess-org/lila/master/public/logo/lichess-discord.png',
+  chesscom:'https://images.chesscomfiles.com/uploads/v1/images_users/tiny_mce/Wind/phpj5m64df058h63fznrZf.png',
+};
 const BCOL={lichess:'#ffffff',chesscom:'#81B64C'};
 const NS='http://www.w3.org/2000/svg';
 export function svgIcon(name,size=18){
@@ -49,8 +55,8 @@ export function svgIcon(name,size=18){
   if(b){s.setAttribute('fill','currentColor');if(BCOL[name])s.style.color=BCOL[name]}
   else{s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round')}
   s.innerHTML=b||P[name]||'';
-  if(b){   // use the official artwork if the user supplied it
-    const im=new Image();im.src=`images/brands/${name}.svg`;
+  if(b){   // swap in the official logo once it has loaded
+    const im=new Image();im.src=BRAND_IMG[name];
     im.onload=()=>{const i=document.createElement('img');i.src=im.src;i.alt='';i.width=size;i.height=size;i.className='i brand';s.replaceWith(i)};
   }
   return s;

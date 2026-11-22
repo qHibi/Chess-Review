@@ -7,7 +7,8 @@ import {classifyAll} from './classification/classify.js';
 import {buildThemes} from './theme.js';
 import {loadOpenings} from './openings.js';
 import {loadPgn} from './pgn.js';
-import {analyze,resumeAll,syncPause} from './analysis.js';
+import {analyze,resumeAll,syncPause,cancelAnalysis} from './analysis.js';
+import {showScreen,screen} from './screens.js';
 import {resetAux} from './live.js';
 import {go} from './nav.js';
 import {render} from './ui/board.js';
@@ -20,7 +21,8 @@ import {hydrateIcons} from './ui/svg.js';
 
 /* ---------- Events ---------- */
 $('bAnalyze').onclick=analyze;
-$('pgn').onchange=()=>{if(!S.batch)loadPgn()};
+$('bNew').onclick=()=>showScreen('import');
+$('bResume').onclick=()=>{showScreen('analysis');render()};
 $('selStrict').onchange=e=>{
   CFG.strict=+e.target.value;
   if(S.batch)return;
@@ -36,14 +38,14 @@ $('bPause').onclick=()=>{
 };
 $('chkDeepen').onchange=e=>{CFG.deepen=e.target.checked;if(!CFG.deepen&&S.deep){S.deep=false;S.paused=false;resumeAll();syncPause();setStatus('Stopped deepening.')}};
 $('selEngine').onchange=()=>{        // switch engines: throw the old workers away and start over
-  S.run++;S.batch=false;S.deep=false;S.paused=false;resumeAll();$('bAnalyze').disabled=false;$('prog').style.width='0';syncPause();
+  cancelAnalysis();
   POOL.splice(0).forEach(e=>e.kill());resetAux();
   ENG.wasmOK=null;ENG.probe=null;setStatus('Loading engine…');
   getPool(1);POOL[0].readyP.then(()=>{if(!S.batch&&!S.deep)setStatus('Engine ready ('+POOL[0].label+').')});
 };
 $('bFlip').onclick=()=>{S.flip=!S.flip;render()};
 document.addEventListener('keydown',e=>{
-  if(e.target.tagName==='TEXTAREA')return;
+  if(screen()!=='analysis'||/^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName))return;
   if(e.key==='ArrowLeft')go(S.idx-1);
   else if(e.key==='ArrowRight')go(S.idx+1);
   else if(e.key==='ArrowUp')go(0);

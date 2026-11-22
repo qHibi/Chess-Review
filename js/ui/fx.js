@@ -2,20 +2,24 @@ import {S} from '../state.js';
 import {$} from '../util.js';
 
 /* ---------- Board effects ----------
-   Only four moments get a special effect - everything is flat colour, no gradients or glows:
-     brilliant    full-board blue flash + shake + blue ripples
-     promotion    gold ripple + sparkles
-     checkmate    every square the winning side uses against the king turns red: the checking line, the pieces that
-                  support the checker, the pieces that cut off the king's escape squares and the pieces that pin a
-                  defender to the king (the squares of the move just played are left alone). Then the mated king is
-                  turned over and gets a "#" badge.
-     stalemate    grey squares close in around the king one by one, then a "=" badge
+   Flat colour only (no gradients or glows). Moments that get an effect:
+     brilliant         full-board blue flash + shake + ripples
+     promotion         gold wave up the pawn's path, ripples and sparkles
+     checkmate         every square the winning side uses against the king turns red (checker, its supporters, pieces that cut
+                       off escape squares, pieces that pin a defender), then a "#" badge on the king
+     stalemate         grey squares close in around the king, then a "=" badge
+     fork              orange lines from the forking piece to everything it attacks
+     pin               purple line from the pinning piece through the pinned piece to what sits behind it
+     discovered check  pink line from the piece that was uncovered to the king
    The effects sit UNDER the pieces and the classification badge (z-index in css/fx.css), so nothing hides them.
-   The entrance animation plays once per effect per analysis; coming back to the move shows only the finished state.
-   The layers are separate from the board squares, so the many re-renders during analysis never restart an animation. */
+   Each plays once per analysis. Coming back to the move later shows nothing (the "#" / "=" badge stays). Settings >
+   Appearance can switch them all off. The layers are separate from the board squares, so the many re-renders during
+   analysis never restart an animation. */
 const FILES='abcdefgh';
 const reduced=()=>!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+export const FX={on:true};
 let seen=new Set(),cur='',st=null;
+export function setFx(on){FX.on=!!on;try{localStorage.setItem('chess.fx',on?'1':'0')}catch(e){}cur='';st=null}
 export function resetFx(){seen=new Set();cur='';st=null}        // new game / new analysis: every entrance may play once again
 
 /* ---- small DOM helpers ---- */
@@ -125,7 +129,90 @@ export function mateLanes(ch){
   return{king:K,groups};
 }
 
-/* ---- the effects ---- */
+/* ---- tactics of the move just played (position after the move) ---- */
+const V={p:1,n:3,b:3,r:5,q:9,k:100};
+const attackers=(b,color,f,r)=>{
+  const out=[];
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+    const p=b[y][x];if(!p||p.color!==color||(x===f&&y===r))continue;
+    if(reach(b,x,y).some(h=>h.f===f&&h.r===r))out.push({f:x,r:y,type:p.type});
+  }
+  return out;
+};
+const S_=(f,r)=>({f,r,kind:'src'}),T_=(f,r)=>({f,r,kind:'tgt'}),L_=([f,r])=>({f,r,kind:'lane'});
+
+// the moved piece attacks two or more enemy pieces that are worth winning (bigger than it, undefended, or the king), and is itself safe
+export function forkOf(ch,mv){
+  const b=ch.board(),[tf,tr]=pos(mv.to),p=b[tr][tf];
+  if(!p||p.type==='k')return null;
+  const me=p.color,foe=me==='w'?'b':'w',val=V[p.type];
+  const hit=attackers(b,foe,tf,tr);
+  if(hit.length){
+    const low=Math.min(...hit.map(a=>V[a.type]));
+    if(low<val||!attackers(b,me,tf,tr).length)return null;           // it can just be taken
+  }
+  const groups=[];
+  reach(b,tf,tr).forEach(h=>{
+    const q=b[h.r][h.f];if(!q||q.color!==foe||q.type==='p')return;
+    if(q.type==='k'||V[q.type]>val||!attackers(b,foe,h.f,h.r).length)groups.push([S_(tf,tr),...h.path.map(L_),T_(h.f,h.r)]);
+  });
+  return groups.length>=2?{kind:'fork',groups}:null;
+}
+// the moved bishop / rook / queen pins an enemy piece against the king or a bigger piece
+export function pinOf(ch,mv){
+  const b=ch.board(),[tf,tr]=pos(mv.to),p=b[tr][tf];
+  if(!p||!'brq'.includes(p.type))return null;
+  const dirs=p.type==='b'?B_DIRS:p.type==='r'?R_DIRS:RING,groups=[];
+  dirs.forEach(([dx,dy])=>{
+    let x=tf+dx,y=tr+dy;const seq=[];let pin=null;
+    while(inb(x,y)){
+      const q=b[y][x];
+      if(!q)seq.push(L_([x,y]));
+      else if(!pin){if(q.color===p.color||q.type==='k')break;pin=[x,y,q];seq.push(T_(x,y))}
+      else{
+        if(q.color!==p.color&&'krq'.includes(q.type)&&V[q.type]>V[pin[2].type])groups.push([S_(tf,tr),...seq,T_(x,y)]);
+        break;
+      }
+      x+=dx;y+=dy;
+    }
+  });
+  return groups.length?{kind:'pin',groups}:null;
+}
+// check given by a piece other than the one that moved (the move uncovered it)
+export function discoveredOf(ch,mv){
+  if(!mv.san||!mv.san.endsWith('+')||/[kq]/.test(mv.flags||''))return null;
+  const b=ch.board(),foe=ch.turn();let K=null;
+  for(let r=0;r<8;r++)for(let f=0;f<8;f++){const p=b[r][f];if(p&&p.type==='k'&&p.color===foe)K=[f,r]}
+  if(!K)return null;
+  const groups=[];
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+    const p=b[y][x];if(!p||p.color===foe||nameOf(x,y)===mv.to)continue;
+    const h=reach(b,x,y).find(h=>h.f===K[0]&&h.r===K[1]);
+    if(h)groups.push([S_(x,y),...h.path.map(L_),T_(K[0],K[1])]);
+  }
+  return groups.length?{kind:'disc',groups}:null;
+}
+export const tacticOf=(ch,mv)=>discoveredOf(ch,mv)||forkOf(ch,mv)||pinOf(ch,mv);
+
+/* ---- the effects ----
+   mode: 2 = play the entrance, 1 = draw the finished state (same visit, e.g. flipping the board), 0 = draw nothing */
+const RANK={lane:0,src:1,tgt:2};
+// Draw groups of squares, each group revealed outward from its first square. Returns when the last square appears.
+function paint(low,groups,cls,mode,skip){
+  const sq=new Map();let t0=0;
+  groups.forEach(g=>{
+    g.forEach((s,i)=>{
+      const n=nameOf(s.f,s.r),e=sq.get(n);
+      if(!e)sq.set(n,{kind:s.kind,t:t0+i*.035});else if(RANK[s.kind]>RANK[e.kind])e.kind=s.kind;
+    });
+    t0+=.05;
+  });
+  skip.forEach(n=>sq.delete(n));
+  let last=0;sq.forEach(v=>{last=Math.max(last,v.t)});
+  const k=last>.5?.5/last:1;                                         // the whole reveal takes at most about half a second
+  if(mode)sq.forEach((v,n)=>cell(low,n,`${cls} ${v.kind}`+(mode===2?' a':''),mode===2?v.t*k:null));
+  return last*k;
+}
 function shake(stage){stage.classList.remove('shake');void stage.offsetWidth;stage.classList.add('shake')}
 function sparks(L,name,colors,n,dist){
   const[f,r]=pos(name),[c,rr]=scr(f,r);
@@ -139,53 +226,51 @@ function brilliant(low,top,stage,to){
   [0,.14].forEach(d=>gone(cell(top,to,'fx-ring blue',d)));
   shake(stage);
 }
-function promotion(top,to){
-  gone(cell(top,to,'fx-ring gold',0));
-  sparks(top,to,['#fff2a8','#ffd23a','#ff9f1c'],14,900);
+function promotion(low,top,mv){
+  const[f0,r0]=pos(mv.from),[f1,r1]=pos(mv.to),n=Math.max(Math.abs(f1-f0),Math.abs(r1-r0));
+  for(let i=0;i<=n;i++){                                             // a wave rises along the pawn's path
+    const f=f0+Math.sign(f1-f0)*i,r=r0+Math.sign(r1-r0)*i,[c,rr]=scr(f,r);
+    gone(cellScr(low,c,rr,'fx-wave',i*.07));
+  }
+  const d=n*.07;
+  [d,d+.12,d+.24].forEach(t=>gone(cell(top,mv.to,'fx-ring gold',t)));
+  sparks(top,mv.to,['#fff2a8','#ffd23a','#ff9f1c'],18,1000);
 }
-function mate(low,ch,a,mv){
+function tactic(low,top,t,mv,mode){
+  const cls={fork:'fx-t fx-fork',pin:'fx-t fx-pin',disc:'fx-t fx-disc'}[t.kind];
+  const end=paint(low,t.groups,cls,mode,[mv.from,mv.to]);
+  if(mode===2){
+    const seen_=new Set();
+    t.groups.forEach(g=>{const e=g[g.length-1];if(t.kind==='disc'&&e.kind==='tgt'||t.kind!=='disc'){const n=nameOf(e.f,e.r);if(!seen_.has(n)){seen_.add(n);gone(cell(top,n,'fx-ring '+({fork:'orange',pin:'purple',disc:'pink'}[t.kind]),end*.6))}}});
+  }
+}
+function mate(low,ch,mode,mv){
   const m=mateLanes(ch);if(!m)return;
-  const sq=new Map();let t0=0;
-  m.groups.forEach(g=>{                                               // each line is drawn outward from its piece, one after another
-    g.forEach((s,i)=>{
-      const n=nameOf(s.f,s.r),e=sq.get(n);
-      if(!e)sq.set(n,{kind:s.kind,t:t0+i*.07});else if(s.kind==='src')e.kind='src';
-    });
-    t0+=.12;
-  });
-  const kn=nameOf(m.king[0],m.king[1]);sq.delete(kn);
-  sq.delete(mv.from);sq.delete(mv.to);                              // the move just played keeps its normal highlight and badge, untouched
-  let last=0;sq.forEach(v=>{last=Math.max(last,v.t)});
-  const k=last>1.2?1.2/last:1;                                        // never take longer than about 1.5 s in total
-  sq.forEach((v,n)=>cell(low,n,'fx-red '+v.kind+(a?' a':''),a?v.t*k:null));
-  const kt=last*k+.12;
-  cell(low,kn,'fx-red king'+(a?' a':''),a?kt:null);
-  st={kind:'mate',turn:true,king:kn,anim:a,kd:kt+.2,bd:kt+.65};
+  const kn=nameOf(m.king[0],m.king[1]);
+  const end=paint(low,m.groups,'fx-red',mode,[kn,mv.from,mv.to]);
+  if(mode)cell(low,kn,'fx-red king'+(mode===2?' a':''),mode===2?end+.05:null);
+  st={kind:'mate',king:kn,anim:mode===2,bd:end+.25};
 }
-function stalemate(low,ch,a){
+function stalemate(low,ch,mode){
   const side=ch.turn(),b=ch.board();let K=null;
   for(let r=0;r<8;r++)for(let f=0;f<8;f++){const p=b[r][f];if(p&&p.type==='k'&&p.color===side)K=[f,r]}
   if(!K)return;
   const[c0,r0]=scr(K[0],K[1]);let n=0;
-  RING.forEach(([dx,dy])=>{
+  if(mode)RING.forEach(([dx,dy])=>{
     const c=c0+dx,r=r0+dy;if(c<0||c>7||r<0||r>7)return;
-    cellScr(low,c,r,'fx-grey'+(a?' a':''),a?.1+n*.1:null);n++;
+    cellScr(low,c,r,'fx-grey'+(mode===2?' a':''),mode===2?.05+n*.06:null);n++;
   });
-  const kt=.1+n*.1+.1;
-  cellScr(low,c0,r0,'fx-grey king'+(a?' a':''),a?kt:null);
-  st={kind:'stale',turn:false,king:nameOf(K[0],K[1]),anim:a,kd:0,bd:kt+.35};
+  const kt=.05+n*.06+.05;
+  if(mode)cellScr(low,c0,r0,'fx-grey king'+(mode===2?' a':''),mode===2?kt:null);
+  st={kind:'stale',king:nameOf(K[0],K[1]),anim:mode===2,bd:kt+.25};
 }
 
-/* The king's own square belongs to the board, which render() rebuilds every time, so the turned king and its badge are
-   put back on every call (without their entrance animation after the first). */
+/* The king's square belongs to the board, which render() rebuilds every time, so the "#" / "=" badge is put back on every
+   call (with its entrance animation only the first time). */
 function decorate(){
-  if(!st)return;
+  if(!st||!FX.on)return;
   const bd=$('board');if(!bd||!bd.children)return;
   const[f,r]=pos(st.king),[c,rr]=scr(f,r),sq=bd.children[rr*8+c];if(!sq)return;
-  if(st.turn){
-    const pc=sq.querySelector('img.pc,.pc-fb');
-    if(pc){pc.classList.add(st.anim?'fx-king-turn':'fx-king-down');if(st.anim)pc.style.animationDelay=st.kd.toFixed(2)+'s'}
-  }
   if(!sq.querySelector('.fx-badge')){
     const b=el('fx-badge '+st.kind+(st.anim?' a':''),sq);
     b.textContent=st.kind==='mate'?'#':'=';
@@ -194,21 +279,22 @@ function decorate(){
   st.anim=false;
 }
 
-function build(low,top,stage,flipOnly,brill){
+function build(low,top,stage,same,brill){
   low.replaceChildren();if(top)top.replaceChildren();stage.classList.remove('shake');st=null;
   const mv=S.moves[S.idx-1],fen=S.fens[S.idx];if(!mv||!fen)return;
   let ch;try{ch=new Chess(fen)}catch(e){return}
   const san=mv.san||'',quiet=reduced();
-  const first=id=>{                                                  // true only the first time this effect is shown in this analysis
-    const k=`${S.line.id}:${S.idx}:${id}`,a=!flipOnly&&!quiet&&!seen.has(k);
-    seen.add(k);return a;
+  const mode=id=>{                                                   // 2 first time, 1 same visit again, 0 shown before
+    const k=`${S.line.id}:${S.idx}:${id}`,had=seen.has(k);seen.add(k);
+    return !had?(quiet?1:2):same?1:0;
   };
   try{
-    if(san.endsWith('#'))mate(low,ch,first('mate'),mv);
-    else if(ch.in_stalemate())stalemate(low,ch,first('stale'));
+    if(san.endsWith('#'))mate(low,ch,mode('mate'),mv);
+    else if(ch.in_stalemate())stalemate(low,ch,mode('stale'));
     else{
-      if(brill&&first('brilliant'))brilliant(low,top,stage,mv.to);
-      if(san.includes('=')&&first('promo'))promotion(top,mv.to);
+      if(brill&&mode('brilliant')===2)brilliant(low,top,stage,mv.to);
+      if(san.includes('=')){const m=mode('promo');if(m===2)promotion(low,top,mv)}
+      else{const t=tacticOf(ch,mv);if(t)tactic(low,top,t,mv,mode(t.kind))}
     }
   }catch(e){}
 }
@@ -219,12 +305,12 @@ export function syncFx(){
   if(!stage._fx){stage._fx=1;stage.addEventListener('animationend',e=>{if(e.target===stage)stage.classList.remove('shake')})}
   const pv=S.preview,idx=S.idx,c=(!pv&&idx>0)?S.cls[idx]:null;
   const brill=!!(c&&c.k==='brilliant');
-  const key=(pv||idx<1)?'':`${S.line.id}:${idx}:${brill?1:0}`;
-  const sig=key+'|'+(S.flip?1:0);
+  const visit=(pv||idx<1||!FX.on)?'':`${S.line.id}:${idx}`;
+  const sig=visit+'|'+(brill?1:0)+'|'+(S.flip?1:0);
   if(sig!==cur){                                                     // unchanged -> leave running animations alone
-    const flipOnly=!!key&&cur.split('|')[0]===key;
+    const same=!!visit&&cur.split('|')[0]===visit;                   // still the same visit to this move (flip, or its class arrived)
     cur=sig;
-    if(key)build(low,top,stage,flipOnly,brill);
+    if(visit)build(low,top,stage,same,brill);
     else{low.replaceChildren();if(top)top.replaceChildren();stage.classList.remove('shake');st=null}
   }
   decorate();

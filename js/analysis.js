@@ -3,6 +3,7 @@ import {$,setStatus} from './util.js';
 import {CFG} from './config.js';
 import {setBtn} from './ui/svg.js';
 import {POOL,getPool,workerCount,terminal} from './engine.js';
+import {showScreen} from './screens.js';
 import {classifyAll,classify,withOver} from './classification/classify.js';
 import {derive} from './derive.js';
 import {fetchBook,bookLength} from './openings.js';
@@ -38,21 +39,29 @@ async function searchGate(w,fen,depth,run){
     if(!r.stopped)return r.lines;
   }
 }
+/* Stop whatever analysis is running and put every flag back, so a new game can start cleanly (importing again before the
+   last analysis finished used to leave S.batch set and the app stuck). Searches in flight come back "stopped" and their loops exit. */
+export function cancelAnalysis(){
+  S.run++;S.batch=false;S.deep=false;S.paused=false;resumeAll();
+  POOL.forEach(e=>e.halt());
+  $('prog').style.width='0';syncPause();
+}
 export function syncPause(){const on=S.batch||S.deep;$('bPause').hidden=!on;setBtn($('bPause'),S.paused?'play':'pause',S.paused?'Resume':'Pause')}
 const bookNote=()=>'Book: '+(S.bookSrc==='openings'?'openings.txt':'built-in list (openings.txt not found)');
 export async function analyze(){
-  if(S.batch)return;
   if(!POOL[0]||!POOL[0].ready){setStatus('Engine is still loading…');return}
-  S.paused=false;resumeAll();S.deep=false;
-  if(!loadPgn())return;
-  const run=++S.run;S.batch=true;$('bAnalyze').disabled=true;syncPause();
+  if(!loadPgn())return;                                   // also cancels any analysis that is still running
+  showScreen('analysis');
+  const run=++S.run;S.batch=true;syncPause();
   sfx('start');resetFx();                               // every board effect may play once again for this analysis
   setStatus('Checking opening book…');
   const M=MAIN;
   await fetchBook(M);
+  if(S.run!==run)return;                                  // another game was loaded meanwhile
   const n=M.fens.length,bl=withLine(M,bookLength),start=Math.min(bl,n-1),total=n-start;
   const nW=Math.max(1,Math.min(workerCount(),total));
   const pool=getPool(nW);await Promise.all(pool.map(e=>e.readyP));
+  if(S.run!==run)return;
   let done=0;
   withLine(M,advance);renderMoves();render();
   async function segment(w,a,b){
@@ -74,7 +83,7 @@ export async function analyze(){
   for(let k=0;k<nW;k++){const a=start+k*size,b=Math.min(n-1,a+size-1);if(a<=b)jobs.push(segment(pool[k],a,b))}
   await Promise.all(jobs);
   if(S.run!==run)return;
-  S.batch=false;$('bAnalyze').disabled=false;
+  S.batch=false;
   withLine(M,classifyAll);M.nextCls=M.fens.length;S.done=true;
   setStatus('Analysis complete at depth '+CFG.depth+'. '+bookNote()+'.');
   sfx('done');
