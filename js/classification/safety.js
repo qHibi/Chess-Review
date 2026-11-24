@@ -176,3 +176,13 @@ export function isPieceTrapped(P,piece,dangerLevels=true){
     return !isPieceSafe(applyMove(P,m),{type:m.promotion||piece.type,color:piece.color,f:m.f,r:m.r},m);
   });
 }
+
+export const toFen=P=>P.b.map(row=>{let s='',n=0;for(const p of row){if(!p)n++;else{if(n){s+=n;n=0}s+=p.color==='w'?p.type.toUpperCase():p.type}}return s+(n||'')}).join('/')+' '+P.turn;
+/* Did the move give check with a piece other than the one that moved (the move uncovered a line)? `currFen` is the position after it.
+   Castling is not counted. */
+export function isDiscoveredCheck(currFen,mv){
+  if(/[kq]/.test(mv.flags||''))return false;
+  const P=parse(currFen),k=kingOf(P,P.turn);
+  if(!k)return false;
+  return geoAttackers(P,k.f,k.r,opp(P.turn)).some(a=>sqName(a.f,a.r)!==mv.to);
+}

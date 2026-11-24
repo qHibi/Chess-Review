@@ -4,6 +4,7 @@ import {uciOf} from '../util.js';
 import {clamp,lineWin,moveAccuracy} from './winPercentage.js';
 import {getIsPieceSacrifice,isSimplePieceRecapture} from './pieces.js';
 import {unsafePieceBrilliant} from './brilliant.js';
+import {isDiscoveredCheck} from './safety.js';
 
 /* ---------- Move classification ----------
    Port of Chesskit's getMovesClassification (GuillaumeSD/Chesskit, src/lib/engine/helpers/moveClassification.ts),
@@ -11,7 +12,10 @@ import {unsafePieceBrilliant} from './brilliant.js';
      Book (openings.txt) -> Forced -> mate delivered (Best) -> Splendid (shown as Brilliant) -> Perfect (shown as Great)
      -> Best (engine's top move) -> basic ladder by win% lost: Excellent / Good (Chesskit: Okay) / Inaccuracy / Mistake / Blunder.
    The rating ladder itself is driven by each move's accuracy (CFG.accT) rather than raw win% loss.
-   Brilliant is a hybrid of Chesskit and WintrChess (WintrChess/wintrchess, shared/src/lib/reporter): the move must be accurate and the
+   Brilliant (default 'sacrifice' mode) needs a REAL sacrifice: material is lost along the engine line, it is not worse than the best
+   non-sacrifice, it is not an obvious discovered check, and it either mates or leaves a real advantage. Under-promotions that beat
+   the queen promotion also count. The older 'hybrid' mode, below, was too generous: it accepted moves that merely left a piece loose.
+   Hybrid mode: Brilliant is a hybrid of Chesskit and WintrChess (WintrChess/wintrchess, shared/src/lib/reporter): the move must be accurate and the
    position still open (Chesskit), pass WintrChess's critical-move gate (see criticalMove below), and then either leave a piece
    that is genuinely loose (WintrChess's piece-safety test, js/classification/brilliant.js) or be the engine's top move with a
    real sacrifice on the principal variation (Chesskit's test). CFG.brilliantMode: 'hybrid' (default), 'chesskit' or 'wintr'.
@@ -30,8 +34,35 @@ function criticalMove(i,A,B,sg,mv){
   if(new Chess(S.fens[i-1]).in_check())return false;
   return true;
 }
+const winFor=(l,white)=>white?lineWin(l):100-lineWin(l);
+const eloOf=white=>{const e=+((S.headers||{})[white?'WhiteElo':'BlackElo']);return isFinite(e)&&e>0?e:1500};   // unknown rating: assume a normal player
+
+/* Under-promotion: brilliant when it is better than promoting to a queen. If the queen promotion is not even among the engine's
+   lines the under-promotion has to be the top line. */
+function underPromotionBeatsQueen(A,B,played,white){
+  const mine=A.find(l=>l.pv[0]===played),queen=A.find(l=>l.pv[0]===played.slice(0,4)+'q');
+  const myW=winFor(mine||B[0],white);
+  if(myW<50)return false;
+  return queen?myW>winFor(queen,white):A[0].pv[0]===played;
+}
+/* The "real sacrifice" method:
+     1. it has to be a real sacrifice: material is actually lost along the engine's line (not just a piece that could be captured)
+     2. a discovered check by a player rated 750+ is not brilliant (they are obvious)
+     3. the sacrifice must not be worse than the best alternative that is NOT a sacrifice
+     4. a forced mate is brilliant; otherwise the move has to leave a real advantage (CFG.brilliantMinWin, win% for the mover) */
+function sacrificeBrilliant(i,A,B,sg,mv,played){
+  const white=sg>0,fen=S.fens[i-1];
+  if(!getIsPieceSacrifice(fen,played,B[0].pv))return false;
+  if(isDiscoveredCheck(S.fens[i],mv)&&eloOf(white)>=750)return false;
+  const mine=A.find(l=>l.pv[0]===played),myW=winFor(mine||B[0],white);
+  const alts=A.filter(l=>l.pv[0]!==played&&!getIsPieceSacrifice(fen,l.pv[0],l.pv.slice(1)));
+  if(alts.length&&myW-Math.max(...alts.map(l=>winFor(l,white)))<0)return false;
+  if(B[0].mate!=null&&sg*B[0].mate>0)return true;
+  return myW>=CFG.brilliantMinWin;
+}
 function isBrilliant(i,A,B,sg,mv,top,played){
-  const mode=CFG.brilliantMode||'hybrid';
+  const mode=CFG.brilliantMode||'sacrifice';
+  if(mode==='sacrifice')return criticalMove(i,A,B,sg,mv)&&sacrificeBrilliant(i,A,B,sg,mv,played);
   const sac=()=>getIsPieceSacrifice(S.fens[i-1],played,B[0].pv);
   if(mode==='chesskit')return sac();
   if(!criticalMove(i,A,B,sg,mv))return false;
@@ -72,7 +103,8 @@ export function classify(i){
   const wAlt=alt?lineWin(alt):null;
   const open=wAlt!=null&&!isLosingOrAltWinning(wAfter,wAlt,white);
 
-  // Brilliant: a real piece sacrifice from a move that is accurate enough
+  // Brilliant: an under-promotion that beats the queen promotion, or a real piece sacrifice from a move that is accurate enough
+  if(mv.promotion&&mv.promotion!=='q'&&underPromotionBeatsQueen(A,B,played,white))return res('brilliant');
   if(open&&a>=T.brilliant&&isBrilliant(i,A,B,sg,mv,top,played))return res('brilliant');
 
   // Great: accurate, not a simple recapture, and it changed the outcome of the game or was the only good move
