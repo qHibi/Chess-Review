@@ -28,7 +28,7 @@ function renderGraph(W){
   svg.appendChild(svgEl('path',{d,fill:'#e8e8e8'}));
   svg.appendChild(svgEl('line',{x1:0,x2:w,y1:h/2,y2:h/2,stroke:'#888','stroke-width':.6,'stroke-dasharray':'3 3'}));
   for(let i=1;i<=n;i++){
-    const c=MAIN.cls[i];if(!c||!['brilliant','great','miss','mistake','blunder'].includes(c.k))continue;
+    const c=MAIN.cls[i];if(!c||!['brilliant','great','miss','mistake','blunder','dogshit'].includes(c.k))continue;
     svg.appendChild(svgEl('circle',{cx:x(i).toFixed(1),cy:y(W[i]).toFixed(1),r:2.8,fill:CLS[c.k].color,stroke:'#111','stroke-width':.6}));
   }
   svg.appendChild(svgEl('line',{id:'gcur',x1:0,x2:0,y1:0,y2:h,stroke:'var(--accent)','stroke-width':1.5}));

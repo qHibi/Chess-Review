@@ -94,6 +94,9 @@ export function classify(i){
 
   // Miss: a win that slips away (the opponent just erred, or there was a forced mate) without the position being lost
   const wb=white?wBefore:100-wBefore,wa=white?wAfter:100-wAfter;
+  if (wb == 100 && wa == 0){
+    return res('dogshit')
+  }
   const prev=S.cls[i-1],prevErr=!!prev&&['inaccuracy','mistake','blunder','miss'].includes(prev.k);
   if(['inaccuracy','mistake'].includes(k)&&prevErr&&wb>=CFG.miss.before&&wa>=CFG.miss.after)return res('miss');
   if(CFG.miss.mate&&['good','inaccuracy','mistake'].includes(k)&&A[0].mate!=null&&sg*A[0].mate>0&&!(B[0].mate!=null&&sg*B[0].mate>0)&&wa>=50)return res('miss');
