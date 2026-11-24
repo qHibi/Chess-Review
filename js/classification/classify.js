@@ -3,6 +3,7 @@ import {CFG,BOOK} from '../config.js';
 import {uciOf} from '../util.js';
 import {clamp,lineWin,moveAccuracy} from './winPercentage.js';
 import {getIsPieceSacrifice,isSimplePieceRecapture} from './pieces.js';
+import {unsafePieceBrilliant} from './brilliant.js';
 
 /* ---------- Move classification ----------
    Port of Chesskit's getMovesClassification (GuillaumeSD/Chesskit, src/lib/engine/helpers/moveClassification.ts),
@@ -10,10 +11,33 @@ import {getIsPieceSacrifice,isSimplePieceRecapture} from './pieces.js';
      Book (openings.txt) -> Forced -> mate delivered (Best) -> Splendid (shown as Brilliant) -> Perfect (shown as Great)
      -> Best (engine's top move) -> basic ladder by win% lost: Excellent / Good (Chesskit: Okay) / Inaccuracy / Mistake / Blunder.
    The rating ladder itself is driven by each move's accuracy (CFG.accT) rather than raw win% loss.
+   Brilliant is a hybrid of Chesskit and WintrChess (WintrChess/wintrchess, shared/src/lib/reporter): the move must be accurate and the
+   position still open (Chesskit), pass WintrChess's critical-move gate (see criticalMove below), and then either leave a piece
+   that is genuinely loose (WintrChess's piece-safety test, js/classification/brilliant.js) or be the engine's top move with a
+   real sacrifice on the principal variation (Chesskit's test). CFG.brilliantMode: 'hybrid' (default), 'chesskit' or 'wintr'.
    Differences: "Forced" uses the number of legal moves (partial analysis can leave a position with one stored line),
    Miss is an addition (Chesskit has none), and a Blunder needs a winning position to be thrown away (CFG.blunder). */
 const isLosingOrAltWinning=(wAfter,wAlt,white)=>(white?wAfter<50:wAfter>50)||(white?wAlt>CFG.altWon:wAlt<100-CFG.altWon);
 
+// WintrChess's isMoveCriticalCandidate: not already completely winning without this move (second-best line >= +7), not in a lost
+// position, not a queen promotion, and not a move that had to be played to get out of check.
+function criticalMove(i,A,B,sg,mv){
+  const cp=l=>l&&l.mate==null?sg*l.v*100:null;
+  const c=cp(A[1])!=null?cp(A[1]):(A[1]?null:cp(B[0]));
+  if(c!=null&&c>=700)return false;
+  if(sg*B[0].v<0)return false;
+  if(mv.promotion==='q')return false;
+  if(new Chess(S.fens[i-1]).in_check())return false;
+  return true;
+}
+function isBrilliant(i,A,B,sg,mv,top,played){
+  const mode=CFG.brilliantMode||'hybrid';
+  const sac=()=>getIsPieceSacrifice(S.fens[i-1],played,B[0].pv);
+  if(mode==='chesskit')return sac();
+  if(!criticalMove(i,A,B,sg,mv))return false;
+  if(unsafePieceBrilliant(S.fens[i-1],S.fens[i],mv))return true;
+  return mode==='hybrid'&&top&&sac();
+}
 export function classify(i){
   const mv=S.moves[i-1],white=mv.color==='w',sg=white?1:-1;
   const A=S.P[i-1],B=S.P[i];
@@ -49,7 +73,7 @@ export function classify(i){
   const open=wAlt!=null&&!isLosingOrAltWinning(wAfter,wAlt,white);
 
   // Brilliant: a real piece sacrifice from a move that is accurate enough
-  if(open&&a>=T.brilliant&&getIsPieceSacrifice(S.fens[i-1],played,B[0].pv))return res('brilliant');
+  if(open&&a>=T.brilliant&&isBrilliant(i,A,B,sg,mv,top,played))return res('brilliant');
 
   // Great: accurate, not a simple recapture, and it changed the outcome of the game or was the only good move
   if(open&&a>=T.great){

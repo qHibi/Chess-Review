@@ -83,6 +83,7 @@ Nf3 Nf6 c4 g6 Nc3 Bg7 e4 d6 d4 O-O Be2 e5 O-O`
    Move classification follows Chesskit (GuillaumeSD/Chesskit, moveClassification.ts): every number is a change in
    winning chances (win%, 0-100) for the side that moved. See js/classification/classify.js. */
 export const CFG={
+  brilliantMode:'hybrid',   // 'hybrid' | 'chesskit' (piece sacrifice on the engine line only) | 'wintr' (loose-piece test only)
   depth:12, strict:1, partial:true, deepen:true, maxDepth:20,
   /* Move classes are decided by the move's accuracy (0-100), computed from the win% lost (see winPercentage.js moveAccuracy).
      The Strictness dropdown stretches or shrinks the gap to 100. */
