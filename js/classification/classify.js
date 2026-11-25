@@ -55,12 +55,19 @@ function sacrificeBrilliant(i,A,B,sg,mv,played){
   const white=sg>0,fen=S.fens[i-1];
   if(!getIsPieceSacrifice(fen,played,B[0].pv))return false;
   if(isDiscoveredCheck(S.fens[i],mv)&&eloOf(white)>=750)return false;
-  const mine=A.find(l=>l.pv[0]===played),myW=winFor(mine||B[0],white);
+  const myW=winFor(B[0],white);                       // B[0] is the line where the sacrificed piece is taken (see captureFirst)
   const alts=A.filter(l=>l.pv[0]!==played&&!getIsPieceSacrifice(fen,l.pv[0],l.pv.slice(1)));
   if(alts.length&&myW-Math.max(...alts.map(l=>winFor(l,white)))<0)return false;
   if(B[0].mate!=null&&sg*B[0].mate>0)return true;
   return myW>=CFG.brilliantMinWin;
 }
+/* The engine's score for the move assumes the opponent's BEST reply, which is usually not taking the sacrificed piece (declining is
+   better for them, so the eval looks worse). A sacrifice is judged on what happens when the piece IS taken: use the opponent's best
+   line that captures on the square the move went to, if the engine searched one, and put it first. */
+const captureFirst=(B,mv)=>{
+  const cap=B.find(l=>l.pv&&l.pv[0]&&l.pv[0].slice(2,4)===mv.to);
+  return cap&&cap!==B[0]?[cap,...B.filter(l=>l!==cap)]:B;
+};
 function isBrilliant(i,A,B,sg,mv,top,played){
   const mode=CFG.brilliantMode||'sacrifice';
   if(mode==='sacrifice')return criticalMove(i,A,B,sg,mv)&&sacrificeBrilliant(i,A,B,sg,mv,played);
@@ -106,7 +113,12 @@ export function classify(i){
 
   // Brilliant: an under-promotion that beats the queen promotion, or a real piece sacrifice from a move that is accurate enough
   if(mv.promotion&&mv.promotion!=='q'&&underPromotionBeatsQueen(A,B,played,white))return res('brilliant');
-  if(open&&a>=T.brilliant&&isBrilliant(i,A,B,sg,mv,top,played))return res('brilliant');
+  {
+    const Bc=(CFG.brilliantMode||'sacrifice')==='sacrifice'?captureFirst(B,mv):B;   // judge a sacrifice by the line where it is accepted
+    const wc=lineWin(Bc[0]),ac=top?100:100-(100-moveAccuracy(white?wBefore:100-wBefore,white?wc:100-wc))/s;
+    const openC=wAlt!=null&&!isLosingOrAltWinning(wc,wAlt,white);
+    if(openC&&ac>=T.brilliant&&isBrilliant(i,A,Bc,sg,mv,top,played))return res('brilliant');
+  }
 
   // Great: accurate, not a simple recapture, and it changed the outcome of the game or was the only good move
   if(open&&a>=T.great){
