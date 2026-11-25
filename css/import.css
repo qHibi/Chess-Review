@@ -13,3 +13,6 @@ body[data-screen=analysis] .import-screen{display:none}
 .import-screen textarea{height:200px}
 .resume{width:100%;margin-top:10px}
 img.i.brand{border-radius:5px;object-fit:contain}
+
+.imp-more{justify-content:center;font-weight:600}
+.imp-more[hidden]{display:none}

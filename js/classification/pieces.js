@@ -9,9 +9,14 @@ export function materialDifference(fen){
   return d;
 }
 
+import {pendingLoss} from './safety.js';
+
 /* Is the played move a real piece sacrifice? Play it plus the engine's best continuation (an even number of plies),
    cancel out captures that were answered by a capture of the same piece type, and see whether the mover ends up
-   down in material. Pawn-only exchanges don't count, and a quiet move after the first one ends the sequence. */
+   down in material. Pawn-only exchanges don't count, and a quiet move after the first one ends the sequence.
+   Game-wide: material that was already pending BEFORE the move (a piece that took something protected earlier and was never
+   recaptured) is not this move's sacrifice, so the line has to lose more than that. Otherwise every decent move after a declined
+   trade would look like a sacrifice, and keep looking like one until the trade was settled. */
 export function getIsPieceSacrifice(fen,played,pv){
   if(!pv||pv.length<1)return false;
   const game=new Chess(fen),whiteToPlay=game.turn()==='w',start=materialDifference(fen);
@@ -31,7 +36,8 @@ export function getIsPieceSacrifice(fen,played,pv){
   }
   if(Math.abs(taken.w.length-taken.b.length)<=1&&taken.w.concat(taken.b).every(p=>p==='p'))return false;
   const diff=materialDifference(game.fen())-start;
-  return (whiteToPlay?diff:-diff)<0;
+  let pending=0;try{pending=pendingLoss(fen)}catch(e){}
+  return (whiteToPlay?diff:-diff)<-pending;
 }
 
 /* Two plies from `fen`: one side captures on a square and the other immediately recaptures a piece of the same value

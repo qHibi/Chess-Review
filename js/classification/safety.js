@@ -186,3 +186,41 @@ export function isDiscoveredCheck(currFen,mv){
   if(!k)return false;
   return geoAttackers(P,k.f,k.r,opp(P.turn)).some(a=>sqName(a.f,a.r)!==mv.to);
 }
+
+/* ---- material that is already pending in a position ----
+   Every attacker / defender of a square, including pieces lined up behind others (x-ray), by plain geometry. */
+function xray(P,f,r,by){
+  const first=geoAttackers(P,f,r,by),out=first.slice(),seen=new Set(first.map(a=>a.f+','+a.r)),stack=first.map(a=>({a,P}));
+  while(stack.length){
+    const{a,P:Q}=stack.pop();
+    if(a.type==='k')continue;
+    const R=clone(Q);R.b[a.r][a.f]=null;
+    geoAttackers(R,f,r,by).forEach(x=>{const k=x.f+','+x.r;if(seen.has(k))return;seen.add(k);out.push(x);stack.push({a:x,P:R})});
+  }
+  return out.map(a=>VAL[a.type]).sort((x,y)=>x-y);
+}
+// static exchange: what the side attacking a square nets by capturing there first and both sides recapturing with their cheapest piece
+function see(target,att,def){
+  const gain=[target];let occ=att[0],ai=1,di=0,d=0;
+  for(;;){
+    d++;gain[d]=occ-gain[d-1];                 // speculative: the piece now on the square gets taken
+    const next=d%2?def[di++]:att[ai++];
+    if(next===undefined)break;
+    occ=next;
+  }
+  while(--d>0)gain[d-1]=-Math.max(-gain[d-1],gain[d]);
+  return gain[0];
+}
+/* How much material the side to move in `fen` is already going to lose if the opponent just starts taking: the sum, over its pieces
+   that can be captured profitably, of the exchange value. A piece that took a defended piece earlier and was never recaptured is the
+   typical case. A later move must not be called a sacrifice just because the engine's line finishes that old exchange. */
+export function pendingLoss(fen){
+  const P=parse(fen),me=P.turn,foe=opp(me);let total=0;
+  for(let r=0;r<8;r++)for(let f=0;f<8;f++){
+    const p=P.b[r][f];if(!p||p.color!==me||p.type==='k')continue;
+    const att=xray(P,f,r,foe);if(!att.length)continue;
+    const g=see(VAL[p.type],att,xray(P,f,r,me));
+    if(g>0)total+=g;
+  }
+  return total;
+}

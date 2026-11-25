@@ -29,6 +29,10 @@ $('selStrict').onchange=e=>{
   if(S.batch)return;
   S.lines.forEach(L=>{if(L.P.length>=2)withLine(L,classifyAll)});renderMoves();if(!$('summaryCard').hidden)renderSummary();render();
 };
+document.addEventListener('jokes-changed',()=>{        // a joke classification was switched on / off
+  if(S.batch)return;
+  S.lines.forEach(L=>{if(L.P.length>=2)withLine(L,classifyAll)});renderMoves();if(!$('summaryCard').hidden)renderSummary();render();
+});
 $('bStart').onclick=()=>go(0);
 $('bPrev').onclick=()=>go(S.idx-1);
 $('bNext').onclick=()=>go(S.idx+1);

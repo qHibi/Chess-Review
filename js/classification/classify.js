@@ -5,6 +5,7 @@ import {clamp,lineWin,moveAccuracy} from './winPercentage.js';
 import {getIsPieceSacrifice,isSimplePieceRecapture} from './pieces.js';
 import {unsafePieceBrilliant} from './brilliant.js';
 import {isDiscoveredCheck} from './safety.js';
+import {jokeFor} from './jokes.js';
 
 /* ---------- Move classification ----------
    Port of Chesskit's getMovesClassification (GuillaumeSD/Chesskit, src/lib/engine/helpers/moveClassification.ts),
@@ -126,9 +127,8 @@ export function classify(i){
 
   // Miss: a win that slips away (the opponent just erred, or there was a forced mate) without the position being lost
   const wb=white?wBefore:100-wBefore,wa=white?wAfter:100-wAfter;
-  if (wb == 100 && wa == 0){
-    return res('dogshit')
-  }
+  const joke=jokeFor({i,white,before:wb,after:wa,k,mv,A,B});        // optional joke labels (off by default, see jokes.js)
+  if(joke)return res(joke);
   const prev=S.cls[i-1],prevErr=!!prev&&['inaccuracy','mistake','blunder','miss'].includes(prev.k);
   if(['inaccuracy','mistake'].includes(k)&&prevErr&&wb>=CFG.miss.before&&wa>=CFG.miss.after)return res('miss');
   if(CFG.miss.mate&&['good','inaccuracy','mistake'].includes(k)&&A[0].mate!=null&&sg*A[0].mate>0&&!(B[0].mate!=null&&sg*B[0].mate>0)&&wa>=50)return res('miss');

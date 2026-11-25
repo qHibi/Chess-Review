@@ -8,39 +8,61 @@ import {render} from './ui/board.js';
 /* ---------- Import from Lichess / Chess.com ----------
    Both APIs are public and send CORS headers, so no API key is needed.
    (A Lichess token would only be needed for private games or higher rate limits.) */
-const MAX=15;
+const PAGE=15,KEEP=150;                                  // games per click, and how many are kept in the browser per site
 
-async function lichessGames(user){
-  const r=await fetch(`https://lichess.org/api/games/user/${encodeURIComponent(user)}?max=${MAX}&pgnInJson=true&clocks=false`,{headers:{Accept:'application/x-ndjson'}});
+async function lichessGames(user,cursor){
+  const until=cursor&&cursor.until?`&until=${cursor.until}`:'';
+  const r=await fetch(`https://lichess.org/api/games/user/${encodeURIComponent(user)}?max=${PAGE}&pgnInJson=true&clocks=false${until}`,{headers:{Accept:'application/x-ndjson'}});
   if(r.status===404)throw new Error('Lichess user not found.');
   if(!r.ok)throw new Error('Lichess returned '+r.status+'.');
-  return(await r.text()).split('\n').filter(Boolean).map(l=>JSON.parse(l)).map(g=>({
+  const games=(await r.text()).split('\n').filter(Boolean).map(l=>JSON.parse(l)).map(g=>({
     pgn:g.pgn,
     white:(g.players.white.user&&g.players.white.user.name)||'Anonymous',wr:g.players.white.rating,
     black:(g.players.black.user&&g.players.black.user.name)||'Anonymous',br:g.players.black.rating,
     result:g.winner?(g.winner==='white'?'1-0':'0-1'):'½-½',kind:g.speed,date:g.createdAt}));
+  const last=games[games.length-1];
+  return{games,cursor:{until:last?last.date-1:0},more:games.length>=PAGE};     // next page: everything older than the oldest one so far
 }
 async function lichessById(id){
   const r=await fetch(`https://lichess.org/game/export/${id}?clocks=false`);
   if(!r.ok)throw new Error('Lichess game not found.');
   return r.text();
 }
-async function chesscomGames(user){
-  const ar=await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(user.toLowerCase())}/games/archives`);
-  if(ar.status===404)throw new Error('Chess.com user not found.');
-  if(!ar.ok)throw new Error('Chess.com returned '+ar.status+'.');
-  const archives=(await ar.json()).archives.slice().reverse(),out=[];   // newest month first
-  for(const url of archives){
-    if(out.length>=MAX)break;
-    const r=await fetch(url);if(!r.ok)continue;
-    for(const g of(await r.json()).games.slice().reverse()){
-      if(!g.pgn)continue;
-      out.push({pgn:g.pgn,white:g.white.username,wr:g.white.rating,black:g.black.username,br:g.black.rating,
-        result:g.white.result==='win'?'1-0':g.black.result==='win'?'0-1':'½-½',kind:g.time_class,date:g.end_time*1000});
-      if(out.length>=MAX)break;
-    }
+/* Chess.com only lists monthly archives (newest last). The cursor is {archives, ai: which month, skip: games already taken from it}. */
+async function chesscomGames(user,cursor){
+  let archives,ai=0,skip=0;
+  if(cursor&&cursor.archives){({archives,ai,skip}=cursor)}
+  else{
+    const ar=await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(user.toLowerCase())}/games/archives`);
+    if(ar.status===404)throw new Error('Chess.com user not found.');
+    if(!ar.ok)throw new Error('Chess.com returned '+ar.status+'.');
+    archives=(await ar.json()).archives.slice().reverse();               // newest month first
   }
-  return out;
+  const out=[];
+  while(out.length<PAGE&&ai<archives.length){
+    const r=await fetch(archives[ai]);
+    if(!r.ok){ai++;skip=0;continue}
+    const list=(await r.json()).games.filter(g=>g.pgn).reverse();
+    const take=list.slice(skip,skip+PAGE-out.length);
+    take.forEach(g=>out.push({pgn:g.pgn,white:g.white.username,wr:g.white.rating,black:g.black.username,br:g.black.rating,
+      result:g.white.result==='win'?'1-0':g.black.result==='win'?'0-1':'½-½',kind:g.time_class,date:g.end_time*1000}));
+    skip+=take.length;
+    if(skip>=list.length){ai++;skip=0}
+  }
+  return{games:out,cursor:{archives,ai,skip},more:ai<archives.length};
+}
+const FETCH={lichess:lichessGames,chesscom:chesscomGames};
+
+/* ---------- Saved lists ----------
+   The fetched game lists (and the PGN box) are kept in the browser's localStorage so they are still there when the visitor comes back.
+   (Real cookies are limited to ~4 KB and are sent with every request, far too small for PGNs.) */
+const CACHE='chess.impCache',DRAFT='chess.pgnDraft';
+function readCache(){try{return JSON.parse(localStorage.getItem(CACHE)||'{}')||{}}catch(e){return{}}}
+function writeCache(c){
+  try{localStorage.setItem(CACHE,JSON.stringify(c))}
+  catch(e){                                                  // storage full: keep fewer games and retry once
+    try{Object.values(c).forEach(v=>{if(v&&v.games)v.games=v.games.slice(0,40)});localStorage.setItem(CACHE,JSON.stringify(c))}catch(e2){}
+  }
 }
 
 let loadTok=0;
@@ -55,49 +77,83 @@ async function loadAndAnalyze(pgn,user,white){
 }
 
 const HINT={
-  lichess:{ph:'Lichess username or game link',msg:'No API key needed. Lists the 15 latest games, or paste a game link.'},
-  chesscom:{ph:'Chess.com username',msg:'No API key needed. Lists the 15 latest games.'},
+  lichess:{ph:'Lichess username or game link',msg:'No API key needed. Lists the latest games (with a Load more button), or paste a game link.'},
+  chesscom:{ph:'Chess.com username',msg:'No API key needed. Lists the latest games (with a Load more button).'},
 };
 export function initImport(){
   const msg=t=>{$('impMsg').textContent=t};
-  let src='pgn';
+  let src='pgn',cur=null;                                   // cur = {user, games, cursor, more} for the visible site list
+  function show(){
+    $('impList').replaceChildren();
+    if(!cur)return;
+    const me=cur.user.toLowerCase();
+    cur.games.forEach(g=>{
+      const isW=g.white.toLowerCase()===me,isB=g.black.toLowerCase()===me;
+      const won=(isW&&g.result==='1-0')||(isB&&g.result==='0-1'),lost=(isW&&g.result==='0-1')||(isB&&g.result==='1-0');
+      const b=document.createElement('button');b.type='button';b.className='imp-g'+(won?' win':lost?' loss':'');
+      const l=document.createElement('span'),r=document.createElement('small');
+      l.textContent=`${g.white} (${g.wr||'?'}) vs ${g.black} (${g.br||'?'}) `;
+      const res=document.createElement('b');res.textContent=g.result;l.appendChild(res);
+      r.textContent=`${g.kind} · ${new Date(g.date).toLocaleDateString()}`;
+      b.append(l,r);
+      b.onclick=()=>{msg('Loaded. Analyzing…');loadAndAnalyze(g.pgn,cur.user,g.white)};
+      $('impList').appendChild(b);
+    });
+    $('impMore').hidden=!(cur.more&&cur.games.length);
+  }
+  function save(){const c=readCache();if(cur){c[src]={user:cur.user,games:cur.games.slice(0,KEEP),cursor:cur.cursor,more:cur.more&&cur.games.length<KEEP}}writeCache(c)}
+  function restore(){
+    const c=readCache()[src];
+    cur=c&&c.games&&c.games.length?c:null;
+    if(cur){
+      try{if(!$('impUser').value)$('impUser').value=cur.user}catch(e){}
+      show();msg(`${cur.games.length} saved games for ${cur.user}. Pick one, or load more.`);
+    }else{$('impMore').hidden=true;$('impList').replaceChildren();msg(HINT[src].msg)}
+  }
   function pick(s){
     src=s;
     document.querySelectorAll('#importCard .tab').forEach(b=>{const on=b.dataset.src===s;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});
     $('importCard').querySelector('[data-pane=pgn]').hidden=s!=='pgn';
     $('importCard').querySelector('[data-pane=site]').hidden=s==='pgn';
-    if(s!=='pgn'){$('impUser').placeholder=HINT[s].ph;msg(HINT[s].msg);$('impList').replaceChildren()}
+    if(s!=='pgn'){$('impUser').placeholder=HINT[s].ph;restore()}
     try{localStorage.setItem('chess.impSrc',s)}catch(e){}
   }
   document.querySelectorAll('#importCard .tab').forEach(b=>b.onclick=()=>pick(b.dataset.src));
-  try{$('impUser').value=localStorage.getItem('chess.impUser')||'';const s=localStorage.getItem('chess.impSrc');if(s&&s!=='pgn'&&HINT[s])pick(s);else pick('pgn')}catch(e){pick('pgn')}
+  try{
+    $('impUser').value=localStorage.getItem('chess.impUser')||'';
+    const d=localStorage.getItem(DRAFT);if(d&&!$('pgn').value.trim())$('pgn').value=d;
+    const s=localStorage.getItem('chess.impSrc');if(s&&s!=='pgn'&&HINT[s])pick(s);else pick('pgn');
+  }catch(e){pick('pgn')}
+  $('pgn').addEventListener('input',()=>{try{localStorage.setItem(DRAFT,$('pgn').value)}catch(e){}});
+
   async function go(){
     const raw=$('impUser').value.trim();
     if(!raw){msg('Enter a username first.');return}
     try{localStorage.setItem('chess.impUser',raw)}catch(e){}
-    $('impList').replaceChildren();
     const link=raw.match(/lichess\.org\/(?:game\/export\/)?([A-Za-z0-9]{8})/);
-    $('impGo').disabled=true;msg('Loading…');
+    $('impGo').disabled=true;$('impMore').disabled=true;msg('Loading…');
     try{
       if(link){await loadAndAnalyze(await lichessById(link[1]));msg('Game loaded.');return}
-      const games=src==='lichess'?await lichessGames(raw):await chesscomGames(raw);
-      if(!games.length){msg('No games found for '+raw+'.');return}
-      msg('Pick a game to analyze.');
-      games.forEach(g=>{
-        const me=raw.toLowerCase(),isW=g.white.toLowerCase()===me,isB=g.black.toLowerCase()===me;
-        const won=(isW&&g.result==='1-0')||(isB&&g.result==='0-1'),lost=(isW&&g.result==='0-1')||(isB&&g.result==='1-0');
-        const b=document.createElement('button');b.type='button';b.className='imp-g'+(won?' win':lost?' loss':'');
-        const l=document.createElement('span'),r=document.createElement('small');
-        l.textContent=`${g.white} (${g.wr||'?'}) vs ${g.black} (${g.br||'?'}) `;
-        const res=document.createElement('b');res.textContent=g.result;l.appendChild(res);
-        r.textContent=`${g.kind} · ${new Date(g.date).toLocaleDateString()}`;
-        b.append(l,r);
-        b.onclick=()=>{msg('Loaded. Analyzing…');loadAndAnalyze(g.pgn,raw,g.white)};
-        $('impList').appendChild(b);
-      });
+      const r=await FETCH[src](raw);
+      if(!r.games.length){cur=null;show();msg('No games found for '+raw+'.');return}
+      cur={user:raw,games:r.games,cursor:r.cursor,more:r.more};
+      show();save();msg('Pick a game to analyze.');
     }catch(e){msg((e&&e.message)||'Could not load games.')}
-    finally{$('impGo').disabled=false}
+    finally{$('impGo').disabled=false;$('impMore').disabled=false}
+  }
+  async function more(){
+    if(!cur||!cur.more)return;
+    $('impGo').disabled=true;$('impMore').disabled=true;const was=$('impMore').textContent;$('impMore').textContent='Loading…';
+    try{
+      const r=await FETCH[src](cur.user,cur.cursor);
+      const seen=new Set(cur.games.map(g=>g.pgn));
+      cur.games=cur.games.concat(r.games.filter(g=>!seen.has(g.pgn)));
+      cur.cursor=r.cursor;cur.more=r.more&&r.games.length>0;
+      show();save();msg(`${cur.games.length} games${cur.more?'':' (that is all of them)'}. Pick one to analyze.`);
+    }catch(e){msg((e&&e.message)||'Could not load more games.')}
+    finally{$('impGo').disabled=false;$('impMore').disabled=false;$('impMore').textContent=was}
   }
   $('impGo').onclick=go;
+  $('impMore').onclick=more;
   $('impUser').onkeydown=e=>{if(e.key==='Enter')go()};
 }

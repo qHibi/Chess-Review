@@ -39,10 +39,10 @@ export const CLS = {
   mistake:    {label:'Mistake',    color:'#FFAE64', sym:'?'},
   blunder:    {label:'Blunder',    color:'#FB4834', sym:'??'},
   book:       {label:'Book',       color:'#D5A47D', sym:'B'},
-  forced:     {label:'Forced',     color:'#81B64C', sym:'→'},
-  dogshit:    {label:'Dogshit',    color:'#5D3209', sym:'XD'}
+  forced:     {label:'Forced',     color:'#81B64C', sym:'→'}
+  // joke classifications register themselves from classification/jokes.js
 };
-export const ORDER=['brilliant','great','best','excellent','good','book','forced','inaccuracy','miss','mistake','blunder', 'dogshit'];
+export const ORDER=['brilliant','great','best','excellent','good','book','forced','inaccuracy','miss','mistake','blunder'];
 
 /* Small opening book (SAN prefixes). A move is "book" while the game follows one of these lines. */
 export const BOOK = `e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3 O-O h3

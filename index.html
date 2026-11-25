@@ -46,6 +46,7 @@
         </div>
         <div class="hint" id="impMsg"></div>
         <div id="impList"></div>
+        <button type="button" class="imp-g imp-more" id="impMore" hidden>Load more games</button>
       </div>
     </div>
 
@@ -163,6 +164,9 @@
         <label>Engines <select class="sel" id="selWorkers"><option value="0">Auto</option><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="6">6</option></select></label>
         <label title="WebAssembly Stockfish is several times faster. If it can't load, the classic JavaScript engine is used automatically">Engine type <select class="sel" id="selEngine"><option value="auto">WASM (fast)</option><option value="asm">Classic (JS)</option></select></label>
       </div>
+      <div class="sub">Joke classifications</div>
+      <div class="form" id="jokeList"></div>
+      <div class="hint">Just for fun. Off by default, and they never change accuracy.</div>
     </div>
 
     <div class="tabpane" data-tabpane="appearance" hidden id="themeCard">

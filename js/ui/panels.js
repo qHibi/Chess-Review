@@ -1,6 +1,7 @@
 import {S} from '../state.js';
 import {$,fmt,pvToSan} from '../util.js';
 import {CLS} from '../config.js';
+import {isJoke} from '../classification/jokes.js';
 import {iconNode} from './icons.js';
 import {render} from './board.js';
 import {phasesFor,PH_NAME} from '../phase.js';
@@ -15,7 +16,7 @@ export function renderVerdict(c,mv){
   const t=document.createElement('div');
   const info=CLS[c.k];
   let txt=`<b>${mv.san}</b> is ${/^[aeiou]/i.test(info.label)?'an':'a'} ${info.label.toLowerCase()}`;
-  if(['inaccuracy','mistake','blunder','dogshit','miss','good','excellent'].includes(c.k)&&c.best&&c.best.pv[0]){
+  if((['inaccuracy','mistake','blunder','miss','good','excellent'].includes(c.k)||isJoke(c.k))&&c.best&&c.best.pv[0]){
     const bs=pvToSan(S.fens[S.idx-1],[c.best.pv[0]],1)[0];
     if(bs)txt+=` · best was <b>${bs.san}</b>`;
   }

@@ -4,6 +4,7 @@ import {setBtn} from './ui/svg.js';
 import {CP} from './ui/picker.js';
 import {FX,setFx} from './ui/fx.js';
 import {render} from './ui/board.js';
+import {JOKES,jokeEnabled,setJoke,loadJokes} from './classification/jokes.js';
 
 /* ---------- Settings dialog: Analysis (presets) and Appearance tabs ----------
    A preset sets the individual controls (which live in the "Custom" section); touching any of those controls switches to Custom. */
@@ -57,6 +58,19 @@ function showTab(t){
   document.querySelectorAll('#settings [data-tabpane]').forEach(p=>{p.hidden=p.dataset.tabpane!==t});
 }
 
+/* one switch per registered joke classification, generated from JOKES (default: all off) */
+function buildJokes(){
+  const box=$('jokeList');if(!box)return;
+  box.innerHTML='';
+  for(const j of JOKES){
+    const row=document.createElement('label'),cb=document.createElement('input');
+    cb.type='checkbox';cb.className='switch';cb.checked=jokeEnabled(j.id);
+    cb.onchange=()=>{setJoke(j.id,cb.checked);document.dispatchEvent(new CustomEvent('jokes-changed'))};
+    row.append(j.label+' ',cb);row.title=j.desc||'';
+    box.append(row);
+    if(j.desc){const h=document.createElement('div');h.className='hint';h.textContent=j.desc;box.append(h)}
+  }
+}
 export function initSettings(){
   let saved=null;
   try{saved=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
@@ -77,6 +91,7 @@ export function initSettings(){
   try{FX.on=localStorage.getItem('chess.fx')!=='0'}catch(e){}
   $('chkFx').checked=FX.on;document.documentElement.classList.toggle('calm',!FX.on);
   $('chkFx').onchange=e=>{setFx(e.target.checked);render()};
+  loadJokes();buildJokes();
   $('presetChip').onclick=()=>open('analysis');
   $('bCloseSet').onclick=close;
   document.querySelectorAll('#settings [data-tab]').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
