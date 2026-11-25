@@ -1,5 +1,6 @@
 import {$} from './util.js';
-import {CFG} from './config.js';
+import {CFG,SF} from './config.js';
+import {findLocal} from './engine.js';
 import {setBtn} from './ui/svg.js';
 import {CP} from './ui/picker.js';
 import {FX,setFx} from './ui/fx.js';
@@ -9,12 +10,12 @@ import {JOKES,jokeEnabled,setJoke,loadJokes} from './classification/jokes.js';
 /* ---------- Settings dialog: Analysis (presets) and Appearance tabs ----------
    A preset sets the individual controls (which live in the "Custom" section); touching any of those controls switches to Custom. */
 const PRESETS={
-  fast:  {label:'Fast',   depth:8,  deepen:false, max:16, partial:true,  strict:1, engine:'asm',  info:'Depth 8, no extra passes, classic JavaScript engine. Starts instantly and works everywhere.'},
-  normal:{label:'Normal', depth:14, deepen:true,  max:18, partial:true,  strict:1, engine:'auto', info:'Depth 14, then the whole game is searched again deeper, up to depth 18 (WebAssembly engine).'},
-  deep:  {label:'Deep',   depth:18, deepen:true,  max:24, partial:false, strict:1, engine:'auto', info:'Depth 18 on every position, then deeper passes up to depth 24 (WebAssembly engine). Slow, most accurate.'},
+  fast:  {label:'Fast',   depth:8,  deepen:false, max:16, partial:true,  strict:1, info:'Depth 8, no extra passes. Starts quickly.'},
+  normal:{label:'Normal', depth:14, deepen:true,  max:18, partial:true,  strict:1, info:'Depth 14, then the whole game is searched again deeper, up to depth 18 (WebAssembly engine).'},
+  deep:  {label:'Deep',   depth:18, deepen:true,  max:24, partial:false, strict:1, info:'Depth 18 on every position, then deeper passes up to depth 24 (WebAssembly engine). Slow, most accurate.'},
 };
 const KEY='chess.analysis2';           // v2: Fast became the default preset
-const IDS=['selDepth','selMax','chkDeepen','chkPartial','selStrict','selWorkers','selEngine'];
+const IDS=['selDepth','selMax','chkDeepen','chkPartial','selStrict','selWorkers'];
 let preset='fast',applying=false;
 
 const val=id=>{const e=$(id);return e.type==='checkbox'?e.checked:e.value};
@@ -43,7 +44,7 @@ function applyPreset(id,fire=true){
   if(P){
     applying=true;
     put('selDepth',P.depth,fire);put('selMax',P.max,fire);put('chkDeepen',P.deepen,fire);put('chkPartial',P.partial,fire);
-    put('selStrict',P.strict,fire);put('selWorkers',0,fire);put('selEngine',P.engine,fire);
+    put('selStrict',P.strict,fire);put('selWorkers',0,fire);
     applying=false;
   }
   readCFG();refresh();save();
@@ -71,6 +72,30 @@ function buildJokes(){
     if(j.desc){const h=document.createElement('div');h.className='hint';h.textContent=j.desc;box.append(h)}
   }
 }
+/* Engine version picker: lists SF.versions, greys out the ones whose files are not in engine/ (checked automatically) */
+const VKEY='chess.sfver';
+function initVersions(){
+  const sel=$('selVersion');if(!sel)return;
+  try{const v=localStorage.getItem(VKEY);if(v&&SF.versions.includes(v))SF.ver=v}catch(e){}
+  sel.innerHTML='';
+  SF.versions.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent='Stockfish '+v;sel.append(o)});
+  sel.value=SF.ver;
+  sel.addEventListener('change',()=>{SF.ver=sel.value;try{localStorage.setItem(VKEY,SF.ver)}catch(e){}info()});
+  let found={};
+  const info=()=>{
+    const f=found[SF.ver];
+    $('verInfo').textContent=!f?'Looking for engine files…':(f.threaded||f.single)?`Stockfish ${SF.ver} lite from engine/${f.threaded?' (multi-threaded where the page allows it)':' (single thread)'}.`
+      :SF.cdn[SF.ver]?`engine/${SF.lite(SF.ver)} not found: using the CDN copy (single thread).`:`engine/${SF.lite(SF.ver)} not found. Add stockfish-${SF.ver}-lite.js and .wasm to engine/.`;
+  };
+  info();
+  findLocal().then(r=>{
+    found=r;
+    [...sel.options].forEach(o=>{const f=r[o.value];const ok=f&&(f.threaded||f.single)||SF.cdn[o.value];o.disabled=!ok;o.textContent='Stockfish '+o.value+(f&&(f.threaded||f.single)?'':SF.cdn[o.value]?' (CDN)':' (not in engine/)')});
+    const usable=v=>{const f=r[v];return f&&(f.threaded||f.single)};
+    if(!usable(SF.ver)&&!SF.cdn[SF.ver]){const alt=SF.versions.find(usable);if(alt){sel.value=alt;sel.dispatchEvent(new Event('change'))}}
+    info();
+  });
+}
 export function initSettings(){
   let saved=null;
   try{saved=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
@@ -91,7 +116,7 @@ export function initSettings(){
   try{FX.on=localStorage.getItem('chess.fx')!=='0'}catch(e){}
   $('chkFx').checked=FX.on;document.documentElement.classList.toggle('calm',!FX.on);
   $('chkFx').onchange=e=>{setFx(e.target.checked);render()};
-  loadJokes();buildJokes();
+  loadJokes();buildJokes();initVersions();
   $('presetChip').onclick=()=>open('analysis');
   $('bCloseSet').onclick=close;
   document.querySelectorAll('#settings [data-tab]').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));

@@ -68,6 +68,25 @@ const captureFirst=(B,mv)=>{
   const cap=B.find(l=>l.pv&&l.pv[0]&&l.pv[0].slice(2,4)===mv.to);
   return cap&&cap!==B[0]?[cap,...B.filter(l=>l!==cap)]:B;
 };
+/* Stalemate sacrifice: the piece the move gives up can be taken, and taking it STALEMATES the mover. That saves a worse position, so it is
+   Brilliant even though the engine's score (the opponent's best reply, which declines) looks like a plain draw.
+   Needs: the mover was clearly worse before, the move really holds the draw (engine eval after it), and the piece is worth more than a pawn. */
+const PV={p:1,n:3,b:3,r:5,q:9,k:0};
+function stalemateSacrifice(i,A,B,sg,white,mv){
+  const T=CFG.stalemate;if(!T||!A||!B||!A.length||!B.length)return false;
+  const wb=winFor(A[0],white),wa=winFor(B[0],white);
+  if(wb>T.before||wa<T.after)return false;
+  try{
+    const before=new Chess(S.fens[i-1]);if(before.in_check())return false;
+    const after=new Chess(S.fens[i]);
+    const piece=(after.board?after.board():null);
+    const file='abcdefgh'.indexOf(mv.to[0]),rank=8-(+mv.to[1]);
+    const mine=piece&&piece[rank]&&piece[rank][file];
+    if(!mine||PV[mine.type]<T.minPiece)return false;
+    const caps=after.moves({verbose:true}).filter(m=>m.to===mv.to);
+    return caps.some(m=>{const g=new Chess(S.fens[i]);g.move({from:m.from,to:m.to,promotion:m.promotion});return !g.in_check()&&g.moves().length===0});
+  }catch(e){return false}
+}
 function isBrilliant(i,A,B,sg,mv,top,played){
   const mode=CFG.brilliantMode||'sacrifice';
   if(mode==='sacrifice')return criticalMove(i,A,B,sg,mv)&&sacrificeBrilliant(i,A,B,sg,mv,played);
@@ -113,6 +132,7 @@ export function classify(i){
 
   // Brilliant: an under-promotion that beats the queen promotion, or a real piece sacrifice from a move that is accurate enough
   if(mv.promotion&&mv.promotion!=='q'&&underPromotionBeatsQueen(A,B,played,white))return res('brilliant');
+  if((CFG.brilliantMode||'sacrifice')==='sacrifice'&&stalemateSacrifice(i,A,B,sg,white,mv))return res('brilliant');
   {
     const Bc=(CFG.brilliantMode||'sacrifice')==='sacrifice'?captureFirst(B,mv):B;   // judge a sacrifice by the line where it is accepted
     const wc=lineWin(Bc[0]),ac=top?100:100-(100-moveAccuracy(white?wBefore:100-wBefore,white?wc:100-wc))/s;

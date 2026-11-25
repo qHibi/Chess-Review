@@ -45,12 +45,12 @@ $('ldPause').onclick=()=>$('bPause').onclick();
 $('ldHide').onclick=()=>hideLoader();
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('loader').hidden&&$('settings').hidden)hideLoader()});
 $('chkDeepen').onchange=e=>{CFG.deepen=e.target.checked;if(!CFG.deepen&&S.deep){S.deep=false;S.paused=false;resumeAll();syncPause();setStatus('Stopped deepening.')}};
-$('selEngine').onchange=()=>{        // switch engines: throw the old workers away and start over
+$('selVersion').addEventListener('change',()=>{        // switch engine version: throw the old workers away and start over
   cancelAnalysis();
   POOL.splice(0).forEach(e=>e.kill());resetAux();
-  ENG.wasmOK=null;ENG.probe=null;setStatus('Loading engine…');
+  ENG.probe=null;setStatus('Loading engine…');
   getPool(1);POOL[0].readyP.then(()=>{if(!S.batch&&!S.deep)setStatus('Engine ready ('+POOL[0].label+').')});
-};
+});
 $('bFlip').onclick=()=>{S.flip=!S.flip;render()};
 document.addEventListener('keydown',e=>{
   if(screen()!=='analysis'||/^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName))return;

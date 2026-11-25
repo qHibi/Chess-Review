@@ -162,8 +162,10 @@
         <label title="Reuse the engine's own lines when the played move is one of its suggestions, so fewer positions need a fresh search">Partial analysis <input type="checkbox" id="chkPartial" class="switch"></label>
         <label>Strictness <select class="sel" id="selStrict"><option value="1.5">Lenient</option><option value="1">Normal</option><option value="0.7">Strict</option></select></label>
         <label>Engines <select class="sel" id="selWorkers"><option value="0">Auto</option><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="6">6</option></select></label>
-        <label title="WebAssembly Stockfish is several times faster. If it can't load, the classic JavaScript engine is used automatically">Engine type <select class="sel" id="selEngine"><option value="auto">WASM (fast)</option><option value="asm">Classic (JS)</option></select></label>
       </div>
+      <div class="sub">Engine</div>
+      <div class="form"><label title="Versions are found automatically from the files in engine/ (stockfish-N-lite.js + .wasm)">Stockfish version <select class="sel" id="selVersion"></select></label></div>
+      <div class="hint" id="verInfo"></div>
       <div class="sub">Joke classifications</div>
       <div class="form" id="jokeList"></div>
       <div class="hint">Just for fun. Off by default, and they never change accuracy.</div>

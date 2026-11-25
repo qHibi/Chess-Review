@@ -3,21 +3,26 @@ import {$,setStatus} from './util.js';
 import {SF,MULTIPV} from './config.js';
 
 export const POOL=[];
-export const ENG={wasmOK:null,probe:null,fetching:null,found:null};
+export const ENG={probe:null,found:null,fetching:{}};
 const isolated=()=>typeof crossOriginIsolated!=='undefined'&&crossOriginIsolated;
 const exists=async u=>{try{return(await fetch(u,{method:'HEAD'})).ok}catch(e){return false}};
-// Which of the self-hosted engine files exist (engine/ next to index.html)? Checked once.
-const findLocal=()=>ENG.found||(ENG.found=Promise.all([exists(SF.dir+SF.full),exists(SF.dir+SF.lite)]).then(([full,lite])=>({full,lite})));
-function getWasm(){   // CDN fallback: download the single-thread .wasm once, shared by every worker
-  return ENG.fetching||(ENG.fetching=(async()=>{
-    for(const base of SF.cdn){
-      try{const r=await fetch(base+SF.single+'.wasm');if(r.ok)return{base,bytes:await r.arrayBuffer()}}catch(e){}
+/* Which Stockfish files exist in engine/ ? Checked once: {version: {threaded, single}} (a build counts when both its .js and .wasm are there). */
+export const findLocal=()=>ENG.found||(ENG.found=Promise.all(SF.versions.map(async v=>{
+  const has=async f=>(await exists(SF.dir+f))&&(await exists(SF.dir+f.replace(/\.js$/,'.wasm')));
+  const [threaded,single]=await Promise.all([has(SF.lite(v)),has(SF.single(v))]);
+  return[v,{threaded,single}];
+})).then(Object.fromEntries));
+function getWasm(v){   // CDN fallback (only versions listed in SF.cdn): download the single-thread .wasm once, shared by every worker
+  const c=SF.cdn[v];if(!c)return Promise.reject(new Error('no CDN copy of Stockfish '+v));
+  return ENG.fetching[v]||(ENG.fetching[v]=(async()=>{
+    for(const base of c.bases){
+      try{const r=await fetch(base+c.name+'.wasm');if(r.ok)return{base,bytes:await r.arrayBuffer(),name:c.name}}catch(e){}
     }
     throw new Error('could not download it');
-  })().catch(e=>{ENG.fetching=null;throw e}));
+  })().catch(e=>{ENG.fetching[v]=null;throw e}));
 }
 // Does the app currently expect a threaded engine? Then one worker with several threads beats several single-thread workers.
-export const threadedLikely=()=>isolated()&&!!ENG.found&&ENG.foundNow&&(ENG.foundNow.full||ENG.foundNow.lite);
+export const threadedLikely=()=>isolated()&&!!ENG.foundNow&&!!(ENG.foundNow[SF.ver]&&ENG.foundNow[SF.ver].threaded);
 export class Engine{
   constructor(){
     this.busy=null;this.pending=null;this.ready=false;this.uci=false;this.failed=null;this.dead=false;this.label='';this.w=null;
@@ -26,20 +31,15 @@ export class Engine{
     this.boot();
   }
   async boot(){
-    if($('selEngine').value!=='asm'){
-      if(ENG.probe)await ENG.probe.catch(()=>{});          // workers created together wait for the first one's verdict
+    if(ENG.probe)await ENG.probe.catch(()=>{});          // workers created together wait for the first one's verdict
+    if(this.dead)return;
+    const p=this.bootWasm();if(!ENG.probe)ENG.probe=p;
+    try{await p}
+    catch(e){
       if(this.dead)return;
-      if(ENG.wasmOK!==false){
-        const p=this.bootWasm();if(!ENG.probe)ENG.probe=p;
-        try{await p;return}
-        catch(e){
-          if(this.dead)return;
-          ENG.wasmOK=false;this.drop();
-          setStatus('WASM engine could not start ('+((e&&e.message)||e)+'). Using the classic engine…');
-        }
-      }
+      this.drop();
+      setStatus('Stockfish '+SF.ver+' could not start ('+((e&&e.message)||e)+').');
     }
-    if(!this.dead)this.bootAsm();
   }
   attach(w){this.w=w;w.onmessage=ev=>this.onMsg(typeof ev.data==='string'?ev.data:'')}
   drop(){try{if(this.w)this.w.terminate()}catch(e){}this.w=null;this.busy=null;this.pending=null;this.ready=false;this.uci=false;this.failed=null}
@@ -61,60 +61,48 @@ export class Engine{
     return Math.max(1,Math.min(SF.maxThreads,Math.floor((hw-1)/n)));
   }
   async bootWasm(){
-    const found=await findLocal();ENG.foundNow=found;
-    const plan=[];
-    if(isolated()){
-      if(found.full)plan.push({kind:'local',file:SF.full,label:'Stockfish 19',threads:true,hash:SF.hash.full,ms:SF.timeout.full});
-      if(found.lite)plan.push({kind:'local',file:SF.lite,label:'Stockfish 19 lite',threads:true,hash:SF.hash.lite,ms:SF.timeout.lite});
-    }
-    plan.push({kind:'cdn',label:'Stockfish 19 lite',threads:false,hash:SF.hash.single,ms:SF.timeout.single});
+    const v=SF.ver,found=await findLocal();ENG.foundNow=found;
+    const f=found[v]||{},plan=[];
+    if(isolated()&&f.threaded)plan.push({kind:'local',file:SF.lite(v),label:'Stockfish '+v+' lite',threads:true,hash:SF.hash.lite,ms:SF.timeout.lite});
+    if(f.single)plan.push({kind:'local',file:SF.single(v),label:'Stockfish '+v+' lite',threads:false,hash:SF.hash.single,ms:SF.timeout.single});
+    if(SF.cdn[v])plan.push({kind:'cdn',label:'Stockfish '+v+' lite',threads:false,hash:SF.hash.single,ms:SF.timeout.single});
+    if(!plan.length)throw new Error('engine/'+SF.lite(v)+' was not found');
     let last;
     for(const c of plan){
       if(this.dead)return;
       try{
         this.cfg={threads:c.threads?this.threadsFor():1,hash:c.hash};
-        const ok=c.kind==='local'?await this.startLocal(c):await this.startCdn(c);
+        const ok=c.kind==='local'?await this.startLocal(c):await this.startCdn(c,v);
         if(ok===false)return;
         this.label=c.label+(this.cfg.threads>1?` · ${this.cfg.threads} threads`:'');
-        ENG.wasmOK=true;return;
+        return;
       }catch(e){last=e;console.warn('['+c.label+'] failed:',e&&e.message);this.drop()}
     }
     throw last||new Error('no engine could start');
   }
   // Self-hosted engine (engine/ next to index.html): a real same-origin Worker, so the build can start its own threads.
   async startLocal(c){
-    setStatus(`Loading ${c.label}… (${c.file.includes('lite')?'small':'large, the first load can take a while'})`);
+    setStatus(`Loading ${c.label}…`);
     const w=new Worker(SF.dir+c.file);
     this.attach(w);this.label=c.label;
     w.onerror=ev=>{this.failed=(ev&&ev.message)||'worker error';if(ev&&ev.preventDefault)ev.preventDefault()};
     return this.waitReady(c.ms);
   }
   // CDN engine (single thread): cross-origin scripts can't be Workers, so a blob worker imports it and is handed the .wasm bytes.
-  async startCdn(c){
+  async startCdn(c,v){
     setStatus('Loading '+c.label+'…');
-    const {base,bytes}=await getWasm();
+    const {base,bytes,name}=await getWasm(v);
     if(this.dead)return false;
     const code='self.onmessage=function(e){var d=e.data;if(!d||!d.__init||self.__go)return;self.__go=1;'+
       'self.Module={wasmBinary:d.wasm,locateFile:function(p){return d.base+p}};importScripts(d.base+d.js)};';
     const url=URL.createObjectURL(new Blob([code],{type:'application/javascript'}));
     let w;
-    try{w=new Worker(url+'#'+base+SF.single+'.wasm')}catch(e){w=new Worker(url)}   // some builds read the .wasm location from the hash
+    try{w=new Worker(url+'#'+base+name+'.wasm')}catch(e){w=new Worker(url)}   // some builds read the .wasm location from the hash
     this.attach(w);this.label=c.label;
     w.onerror=ev=>{this.failed=(ev&&ev.message)||'worker error';if(ev&&ev.preventDefault)ev.preventDefault()};
     const copy=bytes.slice(0);
-    w.postMessage({__init:1,wasm:copy,base,js:SF.single+'.js'},[copy]);
+    w.postMessage({__init:1,wasm:copy,base,js:name+'.js'},[copy]);
     return this.waitReady(c.ms);
-  }
-  async bootAsm(){
-    let src=SF.asm[SF.asm.length-1];
-    for(const u of SF.asm){if(await exists(u)){src=u;break}}
-    try{
-      const blob=new Blob([`importScripts("${src}");`],{type:'application/javascript'});
-      this.attach(new Worker(URL.createObjectURL(blob)));
-    }catch(err){setStatus('Engine failed to start: '+err.message);return}
-    this.label='classic';this.cfg={threads:1,hash:16};
-    this.w.onerror=()=>setStatus('Engine error. Check your connection and reload.');
-    this.send('uci');
   }
   send(c){if(this.w)this.w.postMessage(c)}
   onMsg(line){

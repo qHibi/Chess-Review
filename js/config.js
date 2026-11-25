@@ -2,28 +2,30 @@ export const PIECE = {set:'cburnett'};   // any set in lichess-org/lila public/p
 export const PIECE_URL = (c,p)=>`https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/${PIECE.set}/${c}${p}.svg`;
 export const ICON_FILE = {miss:'missed'};   // the image for "miss" is missed.png
 export const ICON_URL  = k=>`./images/moves/${ICON_FILE[k]||k.toLowerCase()}.png`;
-/* ---------- Stockfish 19 (npm: stockfish@19.0.1) ----------
-   Engine files you host yourself live in  document.baseURI + 'engine/'  (same origin, so the threaded build can run):
-     engine/stockfish-19.js + stockfish-19.wasm            full, multi-threaded (about 94 MB)
-     engine/stockfish-19-lite.js + stockfish-19-lite.wasm  lite, multi-threaded (small)
-   Threads need a cross-origin-isolated page; coi-sw.js (registered by js/coi.js) provides that on GitHub Pages.
-   If a file is missing the loader falls through: full -> lite (both threaded) -> lite single-thread from the CDN -> classic asm. */
+/* ---------- Stockfish ----------
+   Only the LITE builds are used, hosted by you in  document.baseURI + 'engine/'  (same origin, so the threaded build can run).
+   For each version V (19, 18 ...) the app looks for these files and offers the versions it finds in Settings:
+     engine/stockfish-V-lite.js + stockfish-V-lite.wasm                lite, multi-threaded (needs a cross-origin-isolated page, coi-sw.js provides it)
+     engine/stockfish-V-lite-single.js + stockfish-V-lite-single.wasm  lite, single thread (works anywhere; used when the page is not isolated)
+   Only version 19 may fall back to a CDN copy (single thread). There is NO fallback to old JavaScript engines (Stockfish 10 was far too weak).
+   To add a version, drop its files in engine/ and add its number to SF.versions. */
 export const ENGINE_DIR = new URL('engine/', document.baseURI ? document.baseURI : 'localhost:8000').href;
 export const SF = {
-  version: '19.0.1',
+  versions: ['19', '18'],
+  ver: '19',                                   // the selected version (Settings -> Engine version)
   dir: ENGINE_DIR,
-  full: 'stockfish-19.js',
-  lite: 'stockfish-19-lite.js',
-  single: 'stockfish-19-lite-single',     // CDN fallback: <name>.js + <name>.wasm
-  cdn: [
-    'https://cdn.jsdelivr.net/npm/stockfish@19.0.1/bin/',
-    'https://cdn.jsdelivr.net/npm/stockfish@19.0.1/src/',
-    'https://unpkg.com/stockfish@19.0.1/bin/',
-  ],
-  asm: ['https://cdn.jsdelivr.net/npm/stockfish@19.0.1/bin/stockfish-19-asm.js', 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js'],   // classic JS engine, first one that exists is used
-  hash: {full: 128, lite: 64, single: 32},   // MB
+  lite:   v => `stockfish-${v}-lite.js`,
+  single: v => `stockfish-${v}-lite-single.js`,
+  cdn: {                                       // CDN copies (single thread), only for versions listed here
+    '19': {name: 'stockfish-19-lite-single', bases: [
+      'https://cdn.jsdelivr.net/npm/stockfish@19.0.1/bin/',
+      'https://cdn.jsdelivr.net/npm/stockfish@19.0.1/src/',
+      'https://unpkg.com/stockfish@19.0.1/bin/',
+    ]},
+  },
+  hash: {lite: 64, single: 32},   // MB
   maxThreads: 8,
-  timeout: {full: 300000, lite: 90000, single: 45000},
+  timeout: {lite: 90000, single: 45000},
 };
 export const MULTIPV = 3;
 export const OPENINGS_URL = 'openings.txt';  // tab-separated: eco, name, pgn, uci, epd (put it next to index.html)
@@ -85,6 +87,7 @@ Nf3 Nf6 c4 g6 Nc3 Bg7 e4 d6 d4 O-O Be2 e5 O-O`
    winning chances (win%, 0-100) for the side that moved. See js/classification/classify.js. */
 export const CFG={
   brilliantMode:'sacrifice',   // 'sacrifice' (real sacrifice, see classify.js) | 'hybrid' | 'chesskit' | 'wintr' (loose-piece test only)
+  stalemate:{before:40,after:45,minPiece:3},   // stalemate sacrifice: mover was at most `before` win%, the move holds at least `after` win%, and the piece given up is worth `minPiece`+
   brilliantMinWin:60,          // a sacrifice that does not lead to mate must leave the mover at least this win% (60 is about +1.0)
   depth:12, strict:1, partial:true, deepen:true, maxDepth:20,
   /* Move classes are decided by the move's accuracy (0-100), computed from the win% lost (see winPercentage.js moveAccuracy).
