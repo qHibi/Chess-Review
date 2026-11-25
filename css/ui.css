@@ -47,28 +47,9 @@ button svg.i{width:1.15em;height:1.15em}
 .switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:560px){.modal{place-items:end center;padding:0}.sheet{border-radius:14px 14px 0 0;max-height:88vh}}
 @media(prefers-reduced-motion:reduce){.switch,.switch::after{transition:none!important}}
-/* ---------- Game review: rating + phases ---------- */
-.rates{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
-.rate{background:var(--input,#1b1f25);border-radius:10px;padding:10px 12px;border:1px solid var(--line)}
-.rate .rl{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mute)}
-.rate .rv{font-size:28px;font-weight:700;line-height:1.15;margin-top:2px;font-variant-numeric:tabular-nums}
-.rate .rv.none{color:var(--mute)}
-.rate .rs{font-size:11px;color:var(--mute)}
-.phs{display:grid;grid-template-columns:auto 1fr 1fr;gap:8px 10px;align-items:center;margin-top:12px}
-.ph-h{font-size:11px;color:var(--mute)}
-.ph-l{display:flex;align-items:center;gap:7px;font-size:12px}
-.ph-l svg.i{color:var(--mute)}
-.ph-c{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;font-size:12px;min-width:0}
-.ph-c.none{color:var(--mute);display:block}
-.ph-c .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
-.ph-c .bar i{display:block;height:100%;border-radius:3px}
-.ph-c small{color:var(--mute);font-size:11px;min-width:34px;text-align:right}
-#summary{margin-top:6px}
-#summary tr:nth-child(even) td{background:rgba(127,127,127,.06)}
 /* ---------- Import ---------- */
 .imp-g{border-radius:8px}
 @media(max-width:560px){.top .brand b{font-size:15px}}
-#scores .hint{margin-bottom:12px}
 .chip{white-space:nowrap;min-width:0;flex:0 1 auto}.chip span{overflow:hidden;text-overflow:ellipsis}
 /* ---------- Sound ---------- */
 .top-btns{display:flex;gap:8px;align-items:center}

@@ -1,23 +1,12 @@
 import {S,MAIN} from '../state.js';
 import {$} from '../util.js';
-import {CLS,ORDER} from '../config.js';
+import {CLS,ORDER,PIECE_URL} from '../config.js';
 import {isJoke} from '../classification/jokes.js';
 import {gameAccuracy,accColor,blendAcc,ratingFromAcc} from '../accuracy.js';
 import {phasesFor} from '../phase.js';
 import {iconNode} from './icons.js';
-import {svgIcon} from './svg.js';
 import {showLine} from '../nav.js';
 
-function gauge(name,side,r){
-  const R=34,C=2*Math.PI*R,d=document.createElement('div');d.className='gauge';
-  const acc=r?r.acc:null,col=acc==null?'var(--line)':accColor(acc);
-  d.innerHTML=`<svg viewBox="0 0 84 84" width="88" height="88" role="img" aria-label="${side} accuracy ${acc==null?'unknown':acc.toFixed(1)+' percent'}"><circle cx="42" cy="42" r="${R}" fill="none" stroke="var(--line)" stroke-width="7"/>`+
-    `<circle cx="42" cy="42" r="${R}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C*(acc==null?0:acc/100)} ${C}" transform="rotate(-90 42 42)"/>`+
-    `<text x="42" y="48" text-anchor="middle" font-size="18" font-weight="700" fill="currentColor">${acc==null?'–':acc.toFixed(1)}</text></svg>`;
-  const a=document.createElement('div');a.className='gn';a.textContent=name;a.title=name;
-  const b=document.createElement('div');b.className='gs';b.textContent=side+' · accuracy'+(r?` · ${r.n} moves`:'');
-  d.append(a,b);return d;
-}
 const SVGNS='http://www.w3.org/2000/svg';
 const svgEl=(t,at)=>{const e=document.createElementNS(SVGNS,t);for(const k in at)e.setAttribute(k,at[k]);return e};
 function renderGraph(W){
@@ -41,54 +30,50 @@ export function updateCursor(){
   const x=(Math.min(S.idx,n)/n*300).toFixed(1);g.setAttribute('x1',x);g.setAttribute('x2',x);
   g.style.display=S.line===MAIN?'':'none';
 }
-// Estimated rating per side, then accuracy for each phase of the game (opening / middlegame / endgame) as small bars.
-const PHASES=[['open','Opening','book-open'],['mid','Middlegame','zap'],['end','Endgame','flag']];
+/* ---------- Review card (Game Review layout): graph, players, accuracy, rating, move counts, per-phase grades ----------
+   Columns are: label | White | icon | Black, so every row lines up. */
+const PHASES=[['open','Opening'],['mid','Middlegame'],['end','Endgame']];
 const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e};
-function renderScores(ga){
-  const box=$('scores');box.replaceChildren();
-  const ph=phasesFor(MAIN);
-  const stat=(col,key)=>{
-    const d=ga.data[col].filter(x=>!key||ph[x.i]===key),r=key?blendAcc(d):ga[col];
-    return r?{acc:r.acc,rating:ratingFromAcc(r.acc)}:null;
-  };
-  const rates=el('div','rates');
-  [['w','White'],['b','Black']].forEach(([c,side])=>{
-    const s=stat(c,null),card=el('div','rate');
-    const lab=el('div','rl');lab.append(svgIcon('trophy',14),el('span','','Est. rating'));
-    card.append(lab,el('div','rv'+(s?'':' none'),s?String(s.rating):'–'),el('div','rs',(s?s.acc.toFixed(1)+'% accuracy':'no data')+' · '+side));
-    rates.appendChild(card);
-  });
-  const grid=el('div','phs');
-  grid.append(el('span'),el('span','ph-h','White'),el('span','ph-h','Black'));
-  PHASES.forEach(([key,name,ic])=>{
-    const l=el('span','ph-l');l.append(svgIcon(ic,15),el('span','',name));grid.appendChild(l);
-    ['w','b'].forEach(c=>{
-      const s=stat(c,key),cell=el('span','ph-c'+(s?'':' none'));
-      if(s){
-        const bar=el('span','bar'),f=el('i');f.style.width=Math.max(3,s.acc)+'%';f.style.background=accColor(s.acc);bar.appendChild(f);
-        cell.append(bar,el('b','',Math.round(s.acc)+'%'),el('small','','~'+s.rating));
-      }else cell.textContent='–';
-      grid.appendChild(cell);
-    });
-  });
-  box.append(rates,grid,el('div','hint','Ratings are rough estimates from accuracy, not real Elo. Phases are split by material and development.'));
+// accuracy of a phase -> the classification icon that stands for it
+const gradeOf=a=>a>=92?'best':a>=80?'excellent':a>=65?'good':a>=50?'inaccuracy':a>=35?'mistake':'blunder';
+function row(label,w,m,b,cls){
+  const r=el('div','sr '+(cls||''));
+  r.append(el('div','sl',label));
+  [w,m,b].forEach((x,i)=>{const c=el('div','sc '+['w','m','b'][i]);if(x!=null)c.append(x);r.appendChild(c)});
+  return r;
 }
+const box=(txt,side)=>el('div','sbox '+side,txt);
 export function renderSummary(){
-  const t=$('summary');t.replaceChildren();
-  const ga=gameAccuracy(MAIN),H=S.headers||{};
-  const ac=$('acc');ac.replaceChildren(gauge(H.White||'White','White',ga.w),gauge(H.Black||'Black','Black',ga.b));
-  renderGraph(ga.W);renderScores(ga);
+  const ga=gameAccuracy(MAIN),H=S.headers||{},ph=phasesFor(MAIN);
+  renderGraph(ga.W);
+  const body=$('sumBody');body.replaceChildren();
+  let n=0;const add=r=>{r.style.setProperty('--i',n++);body.appendChild(r)};
+
+  const who=(c,name)=>{const d=el('div','who'),im=document.createElement('img');im.src=PIECE_URL(c,'K');im.alt='';im.className='av '+c;d.append(im,el('span','nm',name));d.title=name;return d};
+  add(row('Players',who('w',H.White||'White'),null,who('b',H.Black||'Black'),'players'));
+  add(row('Accuracy',box(ga.w?ga.w.acc.toFixed(1):'–','w'),null,box(ga.b?ga.b.acc.toFixed(1):'–','b'),'boxes'));
+  add(row('Game Rating',box(ga.w?String(ratingFromAcc(ga.w.acc)):'–','w'),null,box(ga.b?String(ratingFromAcc(ga.b.acc)):'–','b'),'boxes'));
+
   const cnt={w:{},b:{}};
   MAIN.moves.forEach((m,k)=>{const c=MAIN.cls[k+1];if(c)cnt[m.color][c.k]=(cnt[m.color][c.k]||0)+1});
-  const hd=document.createElement('tr');hd.innerHTML='<th></th><th>White</th><th>Black</th>';t.appendChild(hd);
+  body.appendChild(el('hr','sdiv'));
   ORDER.forEach(k=>{
-    if(!cnt.w[k]&&!cnt.b[k])return;
-    const tr=document.createElement('tr');const td=document.createElement('td');
-    const ic=iconNode(k,'',16);ic.style.marginRight='6px';
-    td.appendChild(ic);td.appendChild(document.createTextNode(CLS[k].label));tr.appendChild(td);
-    [cnt.w[k]||0,cnt.b[k]||0].forEach(n=>{const d=document.createElement('td');d.textContent=n;tr.appendChild(d)});
-    t.appendChild(tr);
+    const num=c=>{const v=cnt[c][k]||0,e=el('b','num',String(v));e.style.color=CLS[k].color;if(!v)e.classList.add('zero');return e};
+    const ic=iconNode(k,'',26);
+    const r=row(CLS[k].label,num('w'),ic,num('b'),'count');r.querySelector('.sl').style.color='var(--text)';add(r);
   });
+
+  body.appendChild(el('h3','sadv','Advanced Stats'));
+  const stat=(col,key)=>{const d=ga.data[col].filter(x=>ph[x.i]===key),r=blendAcc(d);return r?r.acc:null};
+  PHASES.forEach(([key,name])=>{
+    const cell=c=>{
+      const a=stat(c,key);if(a==null)return el('span','none','–');
+      const w=el('span','grade');w.append(iconNode(gradeOf(a),'',26));w.title=Math.round(a)+'% accuracy';
+      w.append(el('small','',Math.round(a)+'%'));return w;
+    };
+    add(row(name,cell('w'),null,cell('b'),'phase'));
+  });
+  body.appendChild(el('div','hint','Ratings are rough estimates from accuracy, not real Elo. Phases are split by material and development; each icon grades the phase accuracy.'));
   $('summaryCard').hidden=false;
   updateCursor();
 }

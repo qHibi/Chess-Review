@@ -2,10 +2,36 @@ table{width:100%;border-collapse:collapse;font-size:12px}
 td,th{padding:3px 4px;text-align:center;font-weight:400}
 td:first-child{text-align:left}
 td img,td i.ic{width:16px;height:16px;vertical-align:middle;margin-right:5px;display:inline-block;border-radius:50%}
-.accs{display:flex;gap:10px;justify-content:space-around;margin-bottom:10px}
-.gauge{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;flex:1}
-.gauge svg{display:block;color:var(--text)}
-.gauge .gn{font-size:13px;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gauge .gs{font-size:11px;color:var(--mute)}
 #graph{display:block;width:100%;height:auto;border-radius:6px;cursor:pointer;margin:2px 0 10px}
 .sub{font-size:11px;color:var(--mute);margin:14px 0 6px;font-weight:500}
+
+/* ---------- Game Review card: label | White | icon | Black ---------- */
+#graph{border-radius:12px}
+.sumbody{margin-top:6px}
+.sr{display:grid;grid-template-columns:minmax(0,1fr) 72px 72px 72px;align-items:center;min-height:42px;font-size:14px;font-weight:700}
+.sr .sl{padding-right:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr .sc{display:flex;justify-content:center;align-items:center;min-width:0}
+.sr.boxes,.sr.players{min-height:0;padding:6px 0}
+.sr.players .sl,.sr.boxes .sl{align-self:center}
+.who{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:100%}
+.who .av{width:52px;height:52px;border-radius:10px;padding:7px;box-sizing:border-box;background:#f2f2f2;border:2px solid transparent}
+.who .av.b{background:#4a4745;border-color:#111}
+.who .nm{font-size:12px;font-weight:700;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr.players .sc.w,.sr.players .sc.b{grid-column:span 1}
+.sbox{width:92px;padding:11px 0;border-radius:8px;text-align:center;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sbox.w{background:#f2f2f2;color:#262421}.sbox.b{background:#4a4745;color:#fff}
+.sr.boxes .sc{overflow:visible}
+.sdiv{border:0;border-top:1px solid var(--line);margin:10px 0}
+.sr.count .num{font-size:26px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.sr.count .num.zero{opacity:.38}
+.sr.count .sc.m img,.sr.count .sc.m i.ic{width:26px;height:26px;margin:0}
+.sadv{text-align:center;font-size:20px;margin:16px 0 4px}
+.sr.phase .sc.m{visibility:hidden}
+.grade{display:flex;align-items:center;gap:5px}
+.grade small{font-size:11px;color:var(--mute);font-weight:500}
+.sr .none{color:var(--mute)}
+.sumbody .hint{margin-top:12px}
+.sr{animation:sumIn .3s ease both;animation-delay:calc(var(--i,0)*18ms)}
+@keyframes sumIn{from{opacity:0;transform:translateY(5px)}}
+.calm .sr{animation:none}
+@media(prefers-reduced-motion:reduce){.sr{animation:none}}
