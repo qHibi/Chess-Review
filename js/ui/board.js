@@ -6,6 +6,7 @@ import {renderVerdict,renderBar} from './panels.js';
 import {updateCursor} from './summary.js';
 import {onSquare} from '../nav.js';
 import {syncFx} from './fx.js';
+import {renderPlayers} from './players.js';
 
 /* ---------- Render: board ---------- */
 export function render(){
@@ -55,7 +56,7 @@ export function render(){
   keepActiveVisible();
   renderVerdict(c,mv);
   if(fresh){const v=$('verdict');v.classList.remove('rise');void v.offsetWidth;v.classList.add('rise')}
-  renderBar();updateCursor();syncFx();
+  renderBar();updateCursor();syncFx();renderPlayers();
 }
 export function keepActiveVisible(){ // scroll only the move list, never the page
   const box=$('moves'),a=box.querySelector('.mvbtn.on');if(!a)return;

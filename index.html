@@ -35,6 +35,7 @@
         <button type="button" class="tab on" role="tab" data-src="pgn" aria-selected="true">PGN</button>
         <button type="button" class="tab" role="tab" data-src="lichess" data-icon="lichess" aria-selected="false">Lichess</button>
         <button type="button" class="tab" role="tab" data-src="chesscom" data-icon="chesscom" data-size="30" aria-label="Chess.com" title="Chess.com" aria-selected="false"></button>
+        <button type="button" class="tab" role="tab" data-src="saved" aria-selected="false">Saved</button>
       </div>
       <div class="pane" data-pane="pgn">
         <textarea id="pgn" spellcheck="false" placeholder="Paste a PGN here (Chess.com and Lichess exports work as-is)"></textarea>
@@ -47,6 +48,10 @@
         <div class="hint" id="impMsg"></div>
         <div id="impList"></div>
         <button type="button" class="imp-g imp-more" id="impMore" hidden>Load more games</button>
+      </div>
+      <div class="pane" data-pane="saved" hidden>
+        <div class="hint" id="savedMsg"></div>
+        <div id="savedList"></div>
       </div>
     </div>
 
@@ -66,7 +71,9 @@
     <div class="boardwrap">
       <div class="evalbar" id="evalbar"><div class="white" id="evalwhite"></div><span class="top" id="evtop"></span><span class="bot" id="evbot"></span></div>
       <div class="col">
+        <div class="pbar" id="pbTop" hidden></div>
         <div class="bstage" id="bstage"><div class="board" id="board" aria-label="Chess board"></div><div class="fx" id="fx" aria-hidden="true"></div><div class="fx fx-top" id="fxtop" aria-hidden="true"></div></div>
+        <div class="pbar" id="pbBot" hidden></div>
         <div class="controls">
           <button id="bStart" title="Start" data-icon="skip-back"></button><button id="bPrev" title="Previous (←)" data-icon="chevron-left"></button>
           <button id="bNext" title="Next (→)" data-icon="chevron-right"></button><button id="bEnd" title="End" data-icon="skip-forward"></button>

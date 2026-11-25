@@ -1,4 +1,5 @@
 import {S} from './state.js';
+import {listSaved,deleteSaved,openSaved} from './saved.js';
 import {$} from './util.js';
 import {POOL} from './engine.js';
 import {loadPgn} from './pgn.js';
@@ -12,7 +13,7 @@ const PAGE=15,KEEP=150;                                  // games per click, and
 
 async function lichessGames(user,cursor){
   const until=cursor&&cursor.until?`&until=${cursor.until}`:'';
-  const r=await fetch(`https://lichess.org/api/games/user/${encodeURIComponent(user)}?max=${PAGE}&pgnInJson=true&clocks=false${until}`,{headers:{Accept:'application/x-ndjson'}});
+  const r=await fetch(`https://lichess.org/api/games/user/${encodeURIComponent(user)}?max=${PAGE}&pgnInJson=true&clocks=true${until}`,{headers:{Accept:'application/x-ndjson'}});
   if(r.status===404)throw new Error('Lichess user not found.');
   if(!r.ok)throw new Error('Lichess returned '+r.status+'.');
   const games=(await r.text()).split('\n').filter(Boolean).map(l=>JSON.parse(l)).map(g=>({
@@ -24,7 +25,7 @@ async function lichessGames(user,cursor){
   return{games,cursor:{until:last?last.date-1:0},more:games.length>=PAGE};     // next page: everything older than the oldest one so far
 }
 async function lichessById(id){
-  const r=await fetch(`https://lichess.org/game/export/${id}?clocks=false`);
+  const r=await fetch(`https://lichess.org/game/export/${id}?clocks=true`);
   if(!r.ok)throw new Error('Lichess game not found.');
   return r.text();
 }
@@ -110,19 +111,40 @@ export function initImport(){
       show();msg(`${cur.games.length} saved games for ${cur.user}. Pick one, or load more.`);
     }else{$('impMore').hidden=true;$('impList').replaceChildren();msg(HINT[src].msg)}
   }
+  /* Saved analyses: finished games kept in the browser, reopened instantly without searching again */
+  function showSaved(){
+    const box=$('savedList');box.replaceChildren();
+    const list=listSaved();
+    $('savedMsg').textContent=list.length?`${list.length} saved ${list.length===1?'analysis':'analyses'}. Open one to see it again without re-analyzing.`:'Nothing saved yet. Finished analyses show up here.';
+    list.forEach(e=>{
+      const b=document.createElement('div');b.className='imp-g saved';b.tabIndex=0;b.setAttribute('role','button');
+      const l=document.createElement('span'),r=document.createElement('small'),x=document.createElement('button');
+      l.textContent=`${e.white}${e.wr?' ('+e.wr+')':''} vs ${e.black}${e.br?' ('+e.br+')':''} `;
+      const res=document.createElement('b');res.textContent=e.result;l.appendChild(res);
+      const acc=e.acc&&e.acc[0]!=null&&e.acc[1]!=null?` · ${e.acc[0].toFixed(0)}% / ${e.acc[1].toFixed(0)}% acc.`:'';
+      r.textContent=`${e.n} moves · depth ${e.depth}${acc} · ${new Date(e.date).toLocaleDateString()}`;
+      x.type='button';x.className='sv-del';x.textContent='×';x.title='Delete this saved analysis';x.setAttribute('aria-label','Delete');
+      x.onclick=ev=>{ev.stopPropagation();deleteSaved(e.id);showSaved()};
+      const open=()=>{if(!openSaved(e.id)){$('savedMsg').textContent='Could not open that analysis.'}};
+      b.onclick=open;b.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();open()}};
+      const t=document.createElement('div');t.className='sv-t';t.append(l,r);b.append(t,x);box.appendChild(b);
+    });
+  }
   function pick(s){
     src=s;
     document.querySelectorAll('#importCard .tab').forEach(b=>{const on=b.dataset.src===s;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});
     $('importCard').querySelector('[data-pane=pgn]').hidden=s!=='pgn';
-    $('importCard').querySelector('[data-pane=site]').hidden=s==='pgn';
-    if(s!=='pgn'){$('impUser').placeholder=HINT[s].ph;restore()}
+    $('importCard').querySelector('[data-pane=site]').hidden=!HINT[s];
+    $('importCard').querySelector('[data-pane=saved]').hidden=s!=='saved';
+    if(HINT[s]){$('impUser').placeholder=HINT[s].ph;restore()}
+    if(s==='saved')showSaved();
     try{localStorage.setItem('chess.impSrc',s)}catch(e){}
   }
   document.querySelectorAll('#importCard .tab').forEach(b=>b.onclick=()=>pick(b.dataset.src));
   try{
     $('impUser').value=localStorage.getItem('chess.impUser')||'';
     const d=localStorage.getItem(DRAFT);if(d&&!$('pgn').value.trim())$('pgn').value=d;
-    const s=localStorage.getItem('chess.impSrc');if(s&&s!=='pgn'&&HINT[s])pick(s);else pick('pgn');
+    const s=localStorage.getItem('chess.impSrc');if(s&&(HINT[s]||s==='saved'))pick(s);else pick('pgn');
   }catch(e){pick('pgn')}
   $('pgn').addEventListener('input',()=>{try{localStorage.setItem(DRAFT,$('pgn').value)}catch(e){}});
 

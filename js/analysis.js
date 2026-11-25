@@ -14,6 +14,7 @@ import {renderMoves} from './ui/moves.js';
 import {renderBar,renderLines} from './ui/panels.js';
 import {renderSummary} from './ui/summary.js';
 import {flushLines,liveAnalyze} from './live.js';
+import {saveCurrent} from './saved.js';
 import {sfx} from './sound.js';
 import {resetFx} from './ui/fx.js';
 
@@ -91,7 +92,7 @@ export async function analyze(){
   S.batch=false;
   withLine(M,classifyAll);M.nextCls=M.fens.length;S.done=true;
   setStatus('Analysis complete at depth '+CFG.depth+'. '+bookNote()+'.');
-  sfx('done');finishLoader();
+  sfx('done');finishLoader();saveCurrent(CFG.depth);
   renderMoves();renderSummary();render();renderLines();flushLines();
   $('prog').style.width='0';syncPause();
   deepen(run);liveAnalyze();                          // (book positions have no stored search yet)
@@ -125,6 +126,7 @@ export async function deepen(run){
     if(S.run!==run||!S.deep)break;                  // cancelled mid-pass: keep the last complete classification
     d=nd;
     withLine(M,classifyAll);                       // the pass is complete: re-judge every move
+    saveCurrent(nd);
     renderMoves();renderSummary();render();renderLines();
     $('prog').style.width='0';
   }
