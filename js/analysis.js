@@ -6,7 +6,6 @@ import {POOL,getPool,workerCount,terminal} from './engine.js';
 import {showScreen} from './screens.js';
 import {openLoader,updateLoader,finishLoader,hideLoader} from './ui/loader.js';
 import {classifyAll,classify,withOver} from './classification/classify.js';
-import {derive} from './derive.js';
 import {fetchBook,bookLength} from './openings.js';
 import {loadPgn} from './pgn.js';
 import {render} from './ui/board.js';
@@ -74,7 +73,6 @@ export async function analyze(){
     for(let i=a;i<=b;i++){
       if(S.run!==run)return;
       let lines=terminal(M.fens[i]);
-      if(!lines&&CFG.partial&&i>a)lines=withLine(M,()=>derive(i));
       if(!lines){lines=await searchGate(w,M.fens[i],CFG.depth,run);if(lines===null)return}
       if(S.run!==run)return;
       M.P[i]=lines;done++;

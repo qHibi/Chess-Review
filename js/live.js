@@ -3,7 +3,6 @@ import {$} from './util.js';
 import {CFG} from './config.js';
 import {Engine,ENG,POOL,terminal} from './engine.js';
 import {classify,withOver} from './classification/classify.js';
-import {derive} from './derive.js';
 import {render} from './ui/board.js';
 import {renderMoves} from './ui/moves.js';
 import {renderBar,renderLines} from './ui/panels.js';
@@ -26,7 +25,6 @@ export async function runLine(X){
       for(const j of [k-1,k]){
         if(X.P[j]&&X.P[j].length)continue;
         let lines=terminal(X.fens[j]);
-        if(!lines&&CFG.partial&&j>0&&X.P[j-1])lines=withLine(X,()=>derive(j));
         if(!lines){ // search the new position about as deep as the one before it, so the two evaluations are comparable
           const dA=j===k?((X.P[k-1]&&X.P[k-1][0]&&X.P[k-1][0].depth)||0):0;
           const res=await ENG.aux.search(X.fens[j],Math.min(18,Math.max(CFG.depth,dA)));lines=res.lines}

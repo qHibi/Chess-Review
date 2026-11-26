@@ -20,7 +20,7 @@ import {jokeFor} from './jokes.js';
    position still open (Chesskit), pass WintrChess's critical-move gate (see criticalMove below), and then either leave a piece
    that is genuinely loose (WintrChess's piece-safety test, js/classification/brilliant.js) or be the engine's top move with a
    real sacrifice on the principal variation (Chesskit's test). CFG.brilliantMode: 'hybrid' (default), 'chesskit' or 'wintr'.
-   Differences: "Forced" uses the number of legal moves (partial analysis can leave a position with one stored line),
+   Differences: "Forced" uses the number of legal moves (a position may have only one stored line),
    Miss is an addition (Chesskit has none), and a Blunder needs a winning position to be thrown away (CFG.blunder). */
 const isLosingOrAltWinning=(wAfter,wAlt,white)=>(white?wAfter<50:wAfter>50)||(white?wAlt>CFG.altWon:wAlt<100-CFG.altWon);
 

@@ -41,7 +41,7 @@ export function renderLines(){
   const L=curLines();
   if(!L.length){box.innerHTML='<div class="hint">No analysis yet.</div>';return}
   const fen=S.fens[S.idx];
-  const d=(L[0].depth?` · depth ${L[0].depth}`:'')+(L[0].partial?' · reused from earlier line':'');
+  const d=(L[0].depth?` · depth ${L[0].depth}`:'');
   $('linesTitle').textContent='Engine lines'+d;
   L.forEach(l=>{
     const row=document.createElement('div');row.className='line';

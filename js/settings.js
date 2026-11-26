@@ -10,12 +10,12 @@ import {JOKES,jokeEnabled,setJoke,loadJokes} from './classification/jokes.js';
 /* ---------- Settings dialog: Analysis (presets) and Appearance tabs ----------
    A preset sets the individual controls (which live in the "Custom" section); touching any of those controls switches to Custom. */
 const PRESETS={
-  fast:  {label:'Fast',   depth:8,  deepen:false, max:16, partial:true,  strict:1, info:'Depth 8, no extra passes. Starts quickly.'},
-  normal:{label:'Normal', depth:14, deepen:true,  max:18, partial:true,  strict:1, info:'Depth 14, then the whole game is searched again deeper, up to depth 18 (WebAssembly engine).'},
-  deep:  {label:'Deep',   depth:18, deepen:true,  max:24, partial:false, strict:1, info:'Depth 18 on every position, then deeper passes up to depth 24 (WebAssembly engine). Slow, most accurate.'},
+  fast:  {label:'Fast',   depth:8,  deepen:false, max:16,  strict:1, info:'Depth 8, no extra passes. Starts quickly.'},
+  normal:{label:'Normal', depth:14, deepen:true,  max:18,  strict:1, info:'Depth 14, then the whole game is searched again deeper, up to depth 18 (WebAssembly engine).'},
+  deep:  {label:'Deep',   depth:18, deepen:true,  max:24,  strict:1, info:'Depth 18 on every position, then deeper passes up to depth 24 (WebAssembly engine). Slow, most accurate.'},
 };
 const KEY='chess.analysis2';           // v2: Fast became the default preset
-const IDS=['selDepth','selMax','chkDeepen','chkPartial','selStrict','selWorkers'];
+const IDS=['selDepth','selMax','chkDeepen','selStrict','selWorkers'];
 let preset='fast',applying=false;
 
 const val=id=>{const e=$(id);return e.type==='checkbox'?e.checked:e.value};
@@ -26,7 +26,7 @@ function put(id,v,fire){
   if(fire)e.dispatchEvent(new Event('change'));
 }
 function readCFG(){
-  CFG.depth=+val('selDepth');CFG.maxDepth=+val('selMax');CFG.deepen=val('chkDeepen');CFG.partial=val('chkPartial');CFG.strict=+val('selStrict');
+  CFG.depth=+val('selDepth');CFG.maxDepth=+val('selMax');CFG.deepen=val('chkDeepen');CFG.strict=+val('selStrict');
 }
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify({preset,vals:Object.fromEntries(IDS.map(i=>[i,val(i)]))}))}catch(e){}
@@ -43,7 +43,7 @@ function applyPreset(id,fire=true){
   preset=id;const P=PRESETS[id];
   if(P){
     applying=true;
-    put('selDepth',P.depth,fire);put('selMax',P.max,fire);put('chkDeepen',P.deepen,fire);put('chkPartial',P.partial,fire);
+    put('selDepth',P.depth,fire);put('selMax',P.max,fire);put('chkDeepen',P.deepen,fire);
     put('selStrict',P.strict,fire);put('selWorkers',0,fire);
     applying=false;
   }

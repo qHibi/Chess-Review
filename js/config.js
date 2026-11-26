@@ -91,7 +91,7 @@ export const CFG={
   brilliantMode:'sacrifice',   // 'sacrifice' (real sacrifice, see classify.js) | 'hybrid' | 'chesskit' | 'wintr' (loose-piece test only)
   stalemate:{before:40,after:45,minPiece:3},   // stalemate sacrifice: mover was at most `before` win%, the move holds at least `after` win%, and the piece given up is worth `minPiece`+
   brilliantMinWin:60,          // a sacrifice that does not lead to mate must leave the mover at least this win% (60 is about +1.0)
-  depth:12, strict:1, partial:true, deepen:true, maxDepth:20,
+  depth:12, strict:1, deepen:true, maxDepth:20,
   /* Move classes are decided by the move's accuracy (0-100), computed from the win% lost (see winPercentage.js moveAccuracy).
      The Strictness dropdown stretches or shrinks the gap to 100. */
   accT:{
