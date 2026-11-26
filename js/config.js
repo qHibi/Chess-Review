@@ -16,6 +16,8 @@ export const SF = {
   dir: ENGINE_DIR,
   lite:   v => `stockfish-${v}-lite.js`,
   single: v => `stockfish-${v}-lite-single.js`,
+  asm:    v => `stockfish-${v}-asm.js`,         // plain-JavaScript build (no WebAssembly), only used when Engine type is set to JavaScript
+  mode: 'wasm',                                // 'wasm' (default) or 'js'
   cdn: {                                       // CDN copies (single thread), only for versions listed here
     '19': {name: 'stockfish-19-lite-single', bases: [
       'https://cdn.jsdelivr.net/npm/stockfish@19.0.1/bin/',

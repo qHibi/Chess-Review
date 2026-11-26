@@ -15,8 +15,8 @@ const exists=async u=>{try{return(await fetch(u,{method:'HEAD'})).ok}catch(e){re
 /* Which Stockfish files exist in engine/ ? Checked once: {version: {threaded, single}} (a build counts when both its .js and .wasm are there). */
 export const findLocal=()=>ENG.found||(ENG.found=Promise.all(SF.versions.map(async v=>{
   const has=async f=>(await exists(SF.dir+f))&&(await exists(SF.dir+f.replace(/\.js$/,'.wasm')));
-  const [threaded,single]=await Promise.all([has(SF.lite(v)),has(SF.single(v))]);
-  return[v,{threaded,single}];
+  const [threaded,single,asm,liteJs,liteWasm]=await Promise.all([has(SF.lite(v)),has(SF.single(v)),exists(SF.dir+SF.asm(v)),exists(SF.dir+SF.lite(v)),exists(SF.dir+SF.lite(v).replace(/\.js$/,'.wasm'))]);
+  return[v,{threaded,single,asm,wasmOnly:liteWasm&&!liteJs}];     // wasmOnly: a .wasm is there but not the .js that loads it
 })).then(Object.fromEntries));
 function getWasm(v){   // CDN fallback (only versions listed in SF.cdn): download the single-thread .wasm once, shared by every worker
   const c=SF.cdn[v];if(!c)return Promise.reject(new Error('no CDN copy of Stockfish '+v));
@@ -28,7 +28,7 @@ function getWasm(v){   // CDN fallback (only versions listed in SF.cdn): downloa
   })().catch(e=>{ENG.fetching[v]=null;throw e}));
 }
 // Does the app currently expect a threaded engine? Then one worker with several threads beats several single-thread workers.
-export const threadedLikely=()=>isolated()&&!!ENG.foundNow&&!!(ENG.foundNow[SF.ver]&&ENG.foundNow[SF.ver].threaded);
+export const threadedLikely=()=>SF.mode!=='js'&&isolated()&&!!ENG.foundNow&&!!(ENG.foundNow[SF.ver]&&ENG.foundNow[SF.ver].threaded);
 export class Engine{
   constructor(){
     this.busy=null;this.pending=null;this.ready=false;this.uci=false;this.failed=null;this.dead=false;this.label='';this.w=null;
@@ -69,10 +69,15 @@ export class Engine{
   async bootWasm(){
     const v=SF.ver,found=await findLocal();ENG.foundNow=found;
     const f=found[v]||{},plan=[];
+    if(SF.mode==='js'){                                   // JavaScript engine: the asm.js build only, never a CDN copy
+      if(!f.asm)throw new Error('engine/'+SF.asm(v)+' was not found');
+      plan.push({kind:'local',file:SF.asm(v),label:'Stockfish '+v+' (JavaScript)',threads:false,hash:SF.hash.single,ms:SF.timeout.single*2});
+    }else{
     if(isolated()&&f.threaded)plan.push({kind:'local',file:SF.lite(v),label:'Stockfish '+v+' lite',threads:true,hash:SF.hash.lite,ms:SF.timeout.lite});
     if(f.single)plan.push({kind:'local',file:SF.single(v),label:'Stockfish '+v+' lite',threads:false,hash:SF.hash.single,ms:SF.timeout.single});
     if(SF.cdn[v])plan.push({kind:'cdn',label:'Stockfish '+v+' lite',threads:false,hash:SF.hash.single,ms:SF.timeout.single});
-    if(!plan.length)throw new Error('engine/'+SF.lite(v)+' was not found');
+    }
+    if(!plan.length)throw new Error(f.wasmOnly?'engine/'+SF.lite(v).replace(/\.js$/,'.wasm')+' is there, but the engine needs its .js file ('+SF.lite(v)+') next to it to load it':'engine/'+SF.lite(v)+' was not found');
     let last;
     for(const c of plan){
       if(this.dead)return;

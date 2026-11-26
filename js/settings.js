@@ -80,10 +80,16 @@ function initVersions(){
   sel.innerHTML='';
   SF.versions.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent='Stockfish '+v;sel.append(o)});
   sel.value=SF.ver;
+  const mode=$('selMode');
+  try{const m=localStorage.getItem('chess.sfmode');if(m==='js'||m==='wasm')SF.mode=m}catch(e){}
+  mode.value=SF.mode;
+  mode.addEventListener('change',()=>{SF.mode=mode.value;try{localStorage.setItem('chess.sfmode',SF.mode)}catch(e){}info()});
   sel.addEventListener('change',()=>{SF.ver=sel.value;try{localStorage.setItem(VKEY,SF.ver)}catch(e){}info()});
   let found={};
   const info=()=>{
     const f=found[SF.ver];
+    if(f&&SF.mode==='js'){$('verInfo').textContent=f.asm?`Stockfish ${SF.ver} (JavaScript) from engine/${SF.asm(SF.ver)}. Slower than WebAssembly.`:`engine/${SF.asm(SF.ver)} not found. Add it, or switch back to WebAssembly.`;return}
+    if(f&&f.wasmOnly&&!f.single){$('verInfo').textContent=`engine/${SF.lite(SF.ver).replace(/\.js$/,'.wasm')} is there, but the .js file that loads it (${SF.lite(SF.ver)}) is missing. A .wasm cannot run by itself.`;return}
     $('verInfo').textContent=!f?'Looking for engine files…':(f.threaded||f.single)?`Stockfish ${SF.ver} lite from engine/${f.threaded?' (multi-threaded where the page allows it)':' (single thread)'}.`
       :SF.cdn[SF.ver]?`engine/${SF.lite(SF.ver)} not found: using the CDN copy (single thread).`:`engine/${SF.lite(SF.ver)} not found. Add stockfish-${SF.ver}-lite.js and .wasm to engine/.`;
   };
