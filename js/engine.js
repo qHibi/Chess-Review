@@ -2,6 +2,12 @@ import {S} from './state.js';
 import {$,setStatus} from './util.js';
 import {SF,MULTIPV} from './config.js';
 
+/* a worker error, with the file and line, so a syntax error says which script it came from */
+const errText=ev=>{
+  if(!ev)return'worker error';
+  const f=(ev.filename||'').split('/').slice(-2).join('/');
+  return(ev.message||'worker error')+(f?` [${f}:${ev.lineno||0}]`:'');
+};
 export const POOL=[];
 export const ENG={probe:null,found:null,fetching:{}};
 const isolated=()=>typeof crossOriginIsolated!=='undefined'&&crossOriginIsolated;
@@ -85,7 +91,7 @@ export class Engine{
     setStatus(`Loading ${c.label}…`);
     const w=new Worker(SF.dir+c.file);
     this.attach(w);this.label=c.label;
-    w.onerror=ev=>{this.failed=(ev&&ev.message)||'worker error';if(ev&&ev.preventDefault)ev.preventDefault()};
+    w.onerror=ev=>{this.failed=errText(ev);if(ev&&ev.preventDefault)ev.preventDefault()};
     return this.waitReady(c.ms);
   }
   // CDN engine (single thread): cross-origin scripts can't be Workers, so a blob worker imports it and is handed the .wasm bytes.
@@ -99,7 +105,7 @@ export class Engine{
     let w;
     try{w=new Worker(url+'#'+base+name+'.wasm')}catch(e){w=new Worker(url)}   // some builds read the .wasm location from the hash
     this.attach(w);this.label=c.label;
-    w.onerror=ev=>{this.failed=(ev&&ev.message)||'worker error';if(ev&&ev.preventDefault)ev.preventDefault()};
+    w.onerror=ev=>{this.failed=errText(ev);if(ev&&ev.preventDefault)ev.preventDefault()};
     const copy=bytes.slice(0);
     w.postMessage({__init:1,wasm:copy,base,js:name+'.js'},[copy]);
     return this.waitReady(c.ms);
